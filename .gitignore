@@ -1,0 +1,11 @@
+node_modules/
+dist/
+dist-library/
+test-project/
+.local/
+.env
+.env.*
+!.env.example
+*.log
+*.zip
+*.tgz

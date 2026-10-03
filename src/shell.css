@@ -1,0 +1,76 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #202733;
+  color: #dce3ee;
+  font:
+    12px Arial,
+    sans-serif;
+}
+body {
+  display: flex;
+  flex-direction: column;
+}
+gorak-frame-designer {
+  flex: 1;
+  min-height: 0;
+}
+.menubar {
+  height: 27px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #536078;
+  background: #293341;
+  padding: 0 5px;
+  z-index: 10;
+}
+.menubar details {
+  position: relative;
+}
+.menubar summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 5px 12px;
+}
+.menubar summary:hover,
+.menubar details[open] summary {
+  background: #45566e;
+}
+.menubar details > button {
+  display: block;
+  position: relative;
+  min-width: 180px;
+  padding: 7px 12px;
+  text-align: left;
+  border: 0;
+  background: #293341;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.menubar details > button:hover {
+  background: #45566e;
+}
+.menubar details > button:disabled {
+  color: #8996aa;
+  cursor: default;
+}
+.menubar details[open] {
+  align-self: flex-start;
+  box-shadow: 0 3px 10px #0004;
+}
+.status {
+  position: absolute;
+  bottom: 0;
+  left: 90px;
+  right: 310px;
+  padding: 7px 12px;
+  background: #633d43;
+  color: white;
+  z-index: 8;
+}
+.status[hidden] {
+  display: none;
+}
