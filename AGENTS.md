@@ -1,5 +1,7 @@
 # Working on gorak frame designer
 
+Always spell `gorak` in lowercase, including at the start of sentences and in headings, documentation, UI text, commit messages, PR titles and release titles.
+
 Build a modern HTML frame designer matching OpenROAD Workbench frame semantics, with zoom/pan and excellent source navigation. Clean, small, maintainable code is the standard. This repository owns the designer, not the language server or extension.
 
 ## Boundaries and architecture
