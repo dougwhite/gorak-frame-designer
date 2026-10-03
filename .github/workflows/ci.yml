@@ -1,8 +1,9 @@
-name: CI
+name: Test and release
 
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -11,7 +12,7 @@ permissions:
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   checks:
@@ -42,3 +43,49 @@ jobs:
       - name: Desktop smoke test (Linux)
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:desktop
+
+  package:
+    name: Package and validate library
+    needs: checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Package, check tag version, and validate extracted consumer
+        run: npm run release:package
+      - uses: actions/upload-artifact@v4
+        with:
+          name: library-release
+          path: |
+            release/*.tgz
+            release/SHA256SUMS
+          if-no-files-found: error
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: library-release
+          path: release
+      - name: Verify archive checksum
+        working-directory: release
+        run: sha256sum --check SHA256SUMS
+      - name: Create GitHub prerelease from the pushed tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" release/*.tgz release/SHA256SUMS
+          --verify-tag --prerelease --title "gorak frame designer $GITHUB_REF_NAME"
+          --notes "Embeddable ES module library and type declarations for pinned host integration. Verify the archive with SHA256SUMS. No Electron runtime or npm registry publication."
