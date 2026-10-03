@@ -1,6 +1,6 @@
 {
   "name": "gorak-frame-designer",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -14,7 +14,8 @@
     "verify": "npm test && npm run build",
     "build": "npm run check && vite build && vite build --config vite.library.config.ts && tsc --project tsconfig.library.json",
     "desktop": "npm run build && electron .",
-    "test:desktop": "npm run build && electron . --smoke-test"
+    "test:desktop": "npm run build && electron . --smoke-test",
+    "release:package": "node scripts/release.mjs"
   },
   "exports": {
     ".": {
