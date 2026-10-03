@@ -6,6 +6,8 @@
   "license": "MIT",
   "main": "electron/main.cjs",
   "scripts": {
+    "compatibility:fetch": "node scripts/fetch-compatibility.mjs",
+    "test:compatibility": "node --test tests/compatibility.test.mjs",
     "dev": "vite --host 127.0.0.1",
     "check": "tsc --noEmit",
     "test": "node --experimental-strip-types --test tests/*.test.mjs tests/*.test.cjs",

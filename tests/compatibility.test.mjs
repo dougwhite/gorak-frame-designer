@@ -1,0 +1,155 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+import { checkout, verifyCheckout } from "../scripts/compatibility-pin.mjs";
+import { parseWml, propertyEdit, applyIntent } from "../src/wml.ts";
+import { frameFromWml, WML_TO_CSS } from "../src/frame-model.ts";
+import { parseMetadata } from "../src/metadata.ts";
+import { resolveStyles } from "../src/styles.ts";
+
+// Fail closed: missing, modified or wrong-release fixtures must never skip tests.
+verifyCheckout();
+const project = `${checkout}/compatibility/project`;
+const read = (path) => readFileSync(`${project}/${path}`, "utf8");
+const source = read("example/panel.wml");
+const companion = read("example/panel.w4gl");
+const layers = [
+  ["Project", "field_defaults.json"],
+  ["Application", "example/field_defaults.json"],
+  ["Frame", "example/panel.fielddefaults.json"],
+].map(([origin, path]) => ({ origin, defaults: JSON.parse(read(path)) }));
+const doc = parseWml(
+  pathToFileURL(`${project}/example/panel.wml`).href,
+  1,
+  source,
+);
+const metadata = parseMetadata(
+  pathToFileURL(`${project}/example/panel.w4gl`).href,
+  1,
+  companion,
+);
+const frame = frameFromWml(doc, layers, metadata);
+const field = (name) => {
+  const found = frame.fields.find((f) => f.name === name);
+  assert.ok(found, `Missing fixture field ${name}`);
+  return found;
+};
+
+test("release frame loads explicit geometry and table hierarchy", () => {
+  assert.equal(frame.uri, doc.uri);
+  assert.equal(frame.version, 1);
+  assert.equal(frame.width, 6000 * WML_TO_CSS);
+  assert.equal(frame.height, 3000 * WML_TO_CSS);
+  assert.deepEqual(
+    frame.fields.map((f) => [f.kind, f.name]),
+    [
+      ["entryfield", "quantity"],
+      ["buttonfield", "calculate"],
+      ["tablefield", "results"],
+      ["tablebody", ""],
+      ["columnfield", "amount"],
+    ],
+  );
+  const body = frame.fields.find((f) => f.kind === "tablebody");
+  assert.equal(body.parentId, field("results").id);
+  assert.equal(field("amount").parentId, body.id);
+  assert.equal(field("quantity").parentId, undefined);
+  assert.equal(new Set(frame.fields.map((f) => f.id)).size, 5);
+  assert.deepEqual(
+    [
+      field("quantity").x,
+      field("quantity").y,
+      field("quantity").width,
+      field("quantity").height,
+    ],
+    [200, 200, 1400, 300].map((n) => n * WML_TO_CSS),
+  );
+});
+
+test("explicit field state includes integer types and native style identity", () => {
+  assert.equal(field("quantity").properties.datatype, "integer");
+  assert.equal(field("quantity").properties.defaultstring, "before\u0007after");
+  assert.equal(field("quantity").properties.fieldstyle, "0");
+  assert.equal(field("calculate").properties.fieldstyle, "1");
+  assert.equal(field("calculate").label, "Calculate");
+  assert.equal(field("results").properties.fieldstyle, "0");
+  assert.equal(field("amount").prototype.kind, "entryfield");
+  assert.deepEqual(field("amount").prototype.properties, {
+    type: "entryfield",
+    name: "amount",
+    datatype: "integer",
+    width: "1000",
+    fieldstyle: "0",
+  });
+});
+
+test("native palette layers resolve while existing button state retains WML origin", () => {
+  const colour = (count) =>
+    resolveStyles(layers.slice(0, count)).groups.buttonfield.styles.style1
+      .bgcolor;
+  assert.deepEqual([colour(1), colour(2), colour(3)], ["6", "7", "8"]);
+  assert.equal(field("calculate").properties.bgcolor, "6");
+  for (const key of ["bgcolor", "textlabel", "fieldstyle", "width"])
+    assert.equal(field("calculate").propertyOrigins[key], "WML");
+  assert.equal(field("quantity").propertyOrigins.datatype, "WML");
+});
+
+test("navigation spans retain field definitions and opaque embedded event source", () => {
+  for (const f of frame.fields) {
+    const node = doc.nodes.find((n) => n.id === f.id);
+    assert.deepEqual(f.source, { start: node.start, end: node.end });
+    assert.ok(
+      source.slice(f.source.start, f.source.end).startsWith(`<${f.kind}`),
+    );
+    if (f.name) {
+      const span = node.attributes.name.valueSpan;
+      assert.equal(source.slice(span.start, span.end), f.name);
+    }
+  }
+  const button = doc.nodes.find((n) => n.id === field("calculate").id);
+  const script = button.children.find((n) => n.kind === "script");
+  assert.ok(script);
+  const eventSource = source.slice(
+    script.openEnd,
+    script.end - "</script>".length,
+  );
+  assert.match(eventSource, /^<!\[CDATA\[on click =/);
+  assert.match(
+    eventSource,
+    /quantity = CALLPROC score\(capsules = quantity\);/,
+  );
+  assert.ok(source.slice(button.start, button.end).includes(eventSource));
+  assert.equal(frame.metadata, metadata);
+  assert.equal(metadata.attributes.windowwidth.value, "6000");
+  assert.equal(metadata.attributes.windowheight.value, "3000");
+  assert.equal(metadata.text, companion);
+  assert.match(companion, /current_count = counter;/);
+});
+
+test("one versioned property edit preserves every unrelated fixture byte", () => {
+  const button = field("calculate");
+  const node = doc.nodes.find((n) => n.id === button.id);
+  const span = node.attributes.textlabel.valueSpan;
+  const intent = propertyEdit(doc, button.id, "textlabel", "Calculate total");
+  assert.equal(intent.edits.length, 1);
+  const next = applyIntent(doc, intent);
+  assert.equal(
+    next.text,
+    source.slice(0, span.start) + "Calculate total" + source.slice(span.end),
+  );
+  assert.equal(next.version, 2);
+  assert.equal(
+    frameFromWml(next, layers, metadata).fields.find((f) => f.id === button.id)
+      .label,
+    "Calculate total",
+  );
+  assert.throws(() => applyIntent(next, intent), /Stale/);
+  assert.equal(
+    applyIntent(next, propertyEdit(next, button.id, "textlabel", "Calculate"))
+      .text,
+    source,
+  );
+  assert.equal(read("example/panel.wml"), source);
+  assert.equal(read("example/panel.w4gl"), companion);
+});
