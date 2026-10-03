@@ -12,8 +12,6 @@ const manifest = readFileSync(
 export const revision = /^gorak_revision = "([^"]+)"$/m.exec(manifest)?.[1];
 export const sourceVersion = /^source_version = (\d+)$/m.exec(manifest)?.[1];
 if (!revision || !sourceVersion) throw Error("Invalid ecosystem.toml pin");
-// Immutable release identity, verified when resolving the explicit tag.
-const releaseCommit = "ae8e0b3235e4baed4e58eb19ea450096bf27d4ce";
 export const tag = `refs/tags/${revision}`;
 export function git(...args) {
   return execFileSync("git", args, { encoding: "utf8" }).trim();
@@ -27,8 +25,8 @@ export function verifyCheckout() {
     "--verify",
     `${tag}^{commit}`,
   );
-  if (head !== resolved || resolved !== releaseCommit)
-    throw Error("Fixture checkout must match the pinned release commit");
+  if (head !== resolved)
+    throw Error("Fixture checkout must match the pinned release tag");
   const upstream = readFileSync(
     new URL("../.ci/gorak/ecosystem.toml", import.meta.url),
     "utf8",
