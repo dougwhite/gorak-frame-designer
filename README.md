@@ -20,9 +20,13 @@ In Electron, use File → Open to load a `.wml` file. Keep its companion `.w4gl`
 ## Tests
 
 ```sh
-node --experimental-strip-types --test tests/*.test.mjs tests/*.test.cjs
+npm run verify      # behavioural tests, type checks and browser/library builds
 npm run test:desktop
 ```
+
+GitHub Actions runs both commands on Windows and Linux with Node.js 24 for pull
+requests and pushes to `main`. On headless Linux, run the desktop smoke test with
+`xvfb-run -a npm run test:desktop`. The smoke test does not establish Workbench parity.
 
 ## License
 
