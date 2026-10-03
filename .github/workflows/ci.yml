@@ -30,6 +30,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci
+      - name: Fetch pinned gorak compatibility fixtures
+        run: npm run compatibility:fetch
+      - name: Certify gorak release compatibility
+        run: npm run test:compatibility
       - name: Run behavioural tests and build
         run: npm run verify
       - name: Desktop smoke test (Windows)

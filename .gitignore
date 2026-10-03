@@ -3,6 +3,7 @@ dist/
 dist-library/
 test-project/
 .local/
+.ci/
 .env
 .env.*
 !.env.example
