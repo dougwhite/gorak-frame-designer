@@ -76,7 +76,7 @@ export function applyAppearance(
   if (background) element.style.backgroundColor = background;
   if (foreground) element.style.color = foreground;
   if (outline) element.style.borderColor = outline;
-  if (properties.bgpattern === "2")
+  if (["2", "11"].includes(properties.bgpattern ?? ""))
     element.style.backgroundColor = "transparent";
   if (properties.outlinewidth === "0") element.style.borderWidth = "0";
   if (properties.typesize && Number(properties.typesize) > 0)

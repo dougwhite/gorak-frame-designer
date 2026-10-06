@@ -1,6 +1,7 @@
 const { dialog, ipcMain } = require("electron");
 const fs = require("node:fs/promises");
 const path = require("node:path");
+const { loadImages } = require("./image-assets.cjs");
 module.exports = (window) => {
   let opened,
     writing = false;
@@ -81,6 +82,11 @@ module.exports = (window) => {
     authorize(event);
     const i = process.argv.indexOf("--open");
     return i < 0 ? null : load(process.argv[i + 1]);
+  });
+  ipcMain.handle("frame:images", async (event, uri, references) => {
+    authorize(event);
+    if (!opened || uri !== opened.uri) throw Error("No matching open document");
+    return loadImages(path.dirname(opened.uri), references);
   });
   ipcMain.on("frame:title", (event, title) => {
     authorize(event);

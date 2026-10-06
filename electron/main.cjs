@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu } = require("electron");
 const path = require("node:path");
-const smoke = process.argv.includes("--smoke-test");
+const imageSmoke = process.argv.includes("--image-smoke-test");
+const smoke = imageSmoke || process.argv.includes("--smoke-test");
 if (smoke)
   app.setPath(
     "userData",
@@ -20,6 +21,27 @@ app.whenReady().then(async () => {
       preload: path.join(__dirname, "preload.cjs"),
     },
   });
+  if (imageSmoke) {
+    const fs = require("node:fs"),
+      { deflateSync } = require("node:zlib");
+    const folder = path.join(__dirname, "../.local/image-smoke"),
+      images = path.join(folder, "images");
+    fs.mkdirSync(images, { recursive: true });
+    fs.copyFileSync(
+      path.join(
+        __dirname,
+        "../.ci/gorak/compatibility/project/example/images/badge.png",
+      ),
+      path.join(images, "badge.png"),
+    );
+    const mask = "2x2:" + deflateSync(Buffer.from([128, 0])).toString("base64");
+    const file = path.join(folder, "image-smoke.wml");
+    fs.writeFileSync(
+      file,
+      `<frame><topform width="5000" height="3000" bgpattern="9"><bgbitmap src="images/badge.png"/><buttonfield name="action" width="1400" height="300" textlabel="Run"><bitmaplabel src="images/badge.png"/><selectedbitmap src="images/badge.png" mask="${mask}"/></buttonfield><palettefield name="choices" ytop="500" width="1400" height="300"><valuelist><choiceitems><row enumvalue="1"><enumbitmap src="builtin:pal_icon2"/></row></choiceitems></valuelist></palettefield></topform></frame>`,
+    );
+    process.argv.push("--open", file);
+  }
   require("./document-host.cjs")(window);
   window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.webContents.on("will-navigate", (event) => event.preventDefault());
@@ -30,7 +52,7 @@ app.whenReady().then(async () => {
     await window.loadFile(path.join(__dirname, "../dist/index.html"));
     if (smoke) {
       const result = await window.webContents.executeJavaScript(
-        require("./smoke.cjs"),
+        require(imageSmoke ? "./image-smoke.cjs" : "./smoke.cjs"),
       );
       if (result.startsWith("FAIL:")) throw Error(result);
       await new Promise((resolve) => setTimeout(resolve, 250));

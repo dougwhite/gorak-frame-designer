@@ -9,8 +9,11 @@ import {
   type FrameMetadata,
   type DefaultsLayer,
   type EditIntent,
+  imageKey,
+  type FrameImages,
 } from "./designer";
 import "./shell.css";
+import { applyImageTransparency } from "./images";
 import { newFrameSource } from "./new-frame";
 interface OpenedFile {
   uri: string;
@@ -21,6 +24,21 @@ interface OpenedFile {
 declare global {
   interface Window {
     frameHost?: {
+      images(
+        uri: string,
+        references: (string | null)[][],
+      ): Promise<
+        Record<
+          string,
+          {
+            width: number;
+            height: number;
+            png: Uint8Array;
+            transparent?: Uint8Array;
+            flags?: string;
+          }
+        >
+      >;
       open(): Promise<OpenedFile | null>;
       initial(): Promise<OpenedFile | null>;
       save(uri: string, text: string, metadata?: string): Promise<void>;
@@ -35,6 +53,7 @@ const sampleLayers: DefaultsLayer[] = [];
 let current = parseWml("synthetic:example.wml", 1, sample),
   metadata: FrameMetadata | undefined,
   layers = sampleLayers;
+let images: FrameImages = {};
 let saved = { text: current.text, metadata: undefined as string | undefined };
 type Snapshot = { text: string; metadata?: string };
 const undo: Snapshot[] = [],
@@ -58,7 +77,7 @@ function fail(error: unknown): void {
   status.hidden = false;
 }
 function show(next: WmlDocument, nextMetadata = metadata): void {
-  const frame = frameFromWml(next, layers, nextMetadata);
+  const frame = frameFromWml(next, layers, nextMetadata, images);
   current = next;
   metadata = nextMetadata;
   designer.document = frame;
@@ -80,21 +99,69 @@ function remember(stack: Snapshot[], value: Snapshot): void {
     bytes -= old.text.length + (old.metadata?.length ?? 0);
   }
 }
-function load(opened: OpenedFile): void {
-  const next = parseWml(opened.uri, current.version + 1, opened.text);
-  const nextMetadata = opened.metadata
-    ? parseMetadata(
-        opened.metadata.uri,
-        (metadata?.version ?? 0) + 1,
-        opened.metadata.text,
-      )
-    : undefined;
-  frameFromWml(next, opened.layers, nextMetadata);
-  layers = opened.layers;
-  saved = { text: next.text, metadata: nextMetadata?.text };
-  undo.length = redo.length = 0;
-  metadata = nextMetadata;
-  show(next, nextMetadata);
+let loading = false;
+async function load(opened: OpenedFile): Promise<void> {
+  if (loading) throw Error("A frame is already loading");
+  loading = true;
+  designer.inert = menu.inert = true;
+  try {
+    const next = parseWml(opened.uri, current.version + 1, opened.text);
+    const nextMetadata = opened.metadata
+      ? parseMetadata(
+          opened.metadata.uri,
+          (metadata?.version ?? 0) + 1,
+          opened.metadata.text,
+        )
+      : undefined;
+    const nextImages: Record<
+      string,
+      { width: number; height: number; rgba: Uint8ClampedArray }
+    > = {};
+    const references = [
+      ...new Set(next.nodes.filter((n) => n.attributes.src).map(imageKey)),
+    ].map((key) => JSON.parse(key) as (string | null)[]);
+    if (references.length && window.frameHost) {
+      const assets = await window.frameHost.images(opened.uri, references);
+      for (const [key, asset] of Object.entries(assets)) {
+        const bitmap = await createImageBitmap(
+          new Blob([new Uint8Array(asset.png)], { type: "image/png" }),
+        );
+        try {
+          if (bitmap.width !== asset.width || bitmap.height !== asset.height)
+            throw Error("Image dimensions differ");
+          const canvas = document.createElement("canvas");
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const context = canvas.getContext("2d")!;
+          context.drawImage(bitmap, 0, 0);
+          const rgba = context.getImageData(
+            0,
+            0,
+            bitmap.width,
+            bitmap.height,
+          ).data;
+          applyImageTransparency(rgba, asset.flags, asset.transparent);
+          nextImages[key] = {
+            width: bitmap.width,
+            height: bitmap.height,
+            rgba,
+          };
+        } finally {
+          bitmap.close();
+        }
+      }
+    }
+    frameFromWml(next, opened.layers, nextMetadata, nextImages);
+    images = nextImages;
+    layers = opened.layers;
+    saved = { text: next.text, metadata: nextMetadata?.text };
+    undo.length = redo.length = 0;
+    metadata = nextMetadata;
+    show(next, nextMetadata);
+  } finally {
+    loading = false;
+    designer.inert = menu.inert = false;
+  }
 }
 const file = document.createElement("input");
 file.type = "file";
@@ -105,7 +172,7 @@ file.onchange = async () => {
     const f = file.files?.[0];
     if (f) {
       if (f.size > 8_000_000) throw Error("WML exceeds 8 MB");
-      load({ uri: f.name, text: await f.text(), layers: [] });
+      await load({ uri: f.name, text: await f.text(), layers: [] });
     }
   } catch (e) {
     fail(e);
@@ -131,7 +198,7 @@ async function open(): Promise<void> {
     return;
   if (window.frameHost) {
     const opened = await window.frameHost.open();
-    if (opened) load(opened);
+    if (opened) await load(opened);
   } else file.click();
 }
 let saving = false;
@@ -149,7 +216,7 @@ async function save(): Promise<void> {
           state.metadata ??
             '[framesource]\nwindowwidth = "6500"\nwindowheight = "4000"\n\n===\n',
         );
-        if (opened) load(opened);
+        if (opened) await load(opened);
         return;
       }
       await window.frameHost.save(uri, state.text, state.metadata);
@@ -186,7 +253,7 @@ function history(from: Snapshot[], to: Snapshot[]): void {
       metadata && state.metadata !== undefined
         ? parseMetadata(metadata.uri, metadata.version + 1, state.metadata)
         : undefined;
-  frameFromWml(next, layers, nextMetadata);
+  frameFromWml(next, layers, nextMetadata, images);
   remember(to, snapshot());
   from.pop();
   metadata = nextMetadata;
@@ -224,14 +291,14 @@ function group(label: string): HTMLDetailsElement {
   return details;
 }
 const fileMenu = group("File");
-action(fileMenu, "New Frame", () => {
+action(fileMenu, "New Frame", async () => {
   commitInput();
   if (
     dirty() &&
     !window.confirm("Discard unsaved edits and create a new frame?")
   )
     return;
-  load({
+  await load({
     uri: "synthetic:untitled.wml",
     text: newFrameSource().text,
     metadata: {
@@ -280,6 +347,7 @@ window.addEventListener("focusin", (event) => {
 });
 window.addEventListener("blur", closeMenus);
 window.addEventListener("keydown", (event) => {
+  if (loading) return;
   if (event.key === "Escape") closeMenus();
 });
 designer.addEventListener("edit-intent", (event) => {
@@ -295,7 +363,7 @@ designer.addEventListener("edit-intent", (event) => {
       throw Error("Edit targets another document");
     if (next.text === current.text && nextMetadata?.text === metadata?.text)
       return;
-    frameFromWml(next, layers, nextMetadata);
+    frameFromWml(next, layers, nextMetadata, images);
     remember(undo, snapshot());
     redo.length = 0;
     show(next, nextMetadata);
@@ -307,6 +375,7 @@ designer.addEventListener("designer-error", (e) =>
   fail((e as CustomEvent).detail),
 );
 window.addEventListener("keydown", (event) => {
+  if (loading) return;
   if (!(event.ctrlKey || event.metaKey)) return;
   const key = event.key.toLowerCase();
   if (!["s", "z", "y", "o"].includes(key)) return;
@@ -330,7 +399,7 @@ document.body.append(menu, file, designer, status);
 show(current);
 window.frameHost
   ?.initial()
-  .then((opened) => {
-    if (opened) load(opened);
+  .then(async (opened) => {
+    if (opened) await load(opened);
   })
   .catch(fail);

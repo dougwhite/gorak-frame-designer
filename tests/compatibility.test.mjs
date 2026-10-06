@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { checkout, verifyCheckout } from "../scripts/compatibility-pin.mjs";
 import { parseWml, propertyEdit, applyIntent } from "../src/wml.ts";
@@ -152,4 +153,41 @@ test("one versioned property edit preserves every unrelated fixture byte", () =>
   );
   assert.equal(read("example/panel.wml"), source);
   assert.equal(read("example/panel.w4gl"), companion);
+});
+
+test("contract 3 background references retain native metadata through geometry edits", () => {
+  const image = doc.nodes.find((n) => n.kind === "bgbitmap");
+  assert.equal(image.attributes.src.value, "images/badge.png");
+  assert.equal(image.attributes.path.value, "art/badge.png");
+  const pixels = { width: 2, height: 2, rgba: new Uint8ClampedArray(16) };
+  const key = JSON.stringify(["images/badge.png", undefined, undefined]);
+  assert.equal(
+    frameFromWml(doc, layers, metadata, { [key]: pixels }).backgroundBitmap,
+    pixels,
+  );
+  const next = applyIntent(
+    doc,
+    propertyEdit(doc, field("quantity").id, "width", "1500"),
+  );
+  assert.ok(next.text.includes(source.slice(image.start, image.end)));
+});
+
+test("packaged built-in image identities match the certified gorak release", () => {
+  const catalog = JSON.parse(readFileSync("src/builtin-images.json", "utf8"));
+  assert.deepEqual(
+    catalog,
+    JSON.parse(
+      readFileSync(
+        `${checkout}/src/gorak/templates/builtin_images.json`,
+        "utf8",
+      ),
+    ),
+  );
+  for (const entry of Object.values(catalog))
+    assert.equal(
+      createHash("sha256")
+        .update(readFileSync(`src/builtin-images/${entry.file}`))
+        .digest("hex"),
+      entry.sha256,
+    );
 });

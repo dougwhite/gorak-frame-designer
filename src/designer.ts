@@ -32,11 +32,12 @@ import {
   type GroupKind,
 } from "./grouping";
 import type { FieldChoice } from "./choices";
-import { renderField } from "./field-view";
+import { renderField, applyBitmapBackground } from "./field-view";
 import { pageVisible, fieldClip } from "./field-visibility";
 import type { FieldBitmap } from "./bitmap";
 export * from "./wml";
 export * from "./metadata";
+export { imageKey, type FrameImages } from "./images";
 export { frameFromWml, WML_TO_CSS } from "./frame-model";
 export interface FrameField {
   id: string;
@@ -57,6 +58,7 @@ export interface FrameField {
   tabTarget?: { folderId: string; index: number };
   bitmap?: FieldBitmap;
   selectedBitmap?: FieldBitmap;
+  backgroundBitmap?: FieldBitmap;
   prototype?: {
     kind: string;
     properties: Readonly<Record<string, string>>;
@@ -64,6 +66,7 @@ export interface FrameField {
   };
 }
 export interface FrameDocument {
+  backgroundBitmap?: FieldBitmap;
   uri: string;
   version: number;
   title: string;
@@ -317,6 +320,11 @@ export class GorakFrameDesigner extends HTMLElement {
       transform: `scale(${this.#zoom})`,
     });
     applyAppearance(canvas, doc.formProperties ?? {});
+    applyBitmapBackground(
+      canvas,
+      doc.backgroundBitmap,
+      doc.formProperties?.bgpattern,
+    );
     extent.style.width = `${doc.width * this.#zoom + 24}px`;
     extent.style.height = `${doc.height * this.#zoom + 24}px`;
     this.#root.querySelector(".zoomtools span")!.textContent =
