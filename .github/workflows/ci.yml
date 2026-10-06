@@ -81,14 +81,18 @@ jobs:
       - name: Verify archive checksum
         working-directory: release
         run: sha256sum --check SHA256SUMS
-      - name: Create GitHub prerelease from the pushed tag
+      - name: Publish validated GitHub prerelease assets
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME" release/*.tgz release/SHA256SUMS
-          --verify-tag --prerelease --title "gorak frame designer $GITHUB_REF_NAME"
-          --notes "Embeddable ES module library and type declarations for pinned host integration. Verify the archive with SHA256SUMS. No Electron runtime or npm registry publication."
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/*.tgz release/SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/*.tgz release/SHA256SUMS \
+              --verify-tag --prerelease --title "gorak frame designer $GITHUB_REF_NAME" \
+              --notes "Embeddable ES module library and type declarations for pinned host integration. Verify the archive with SHA256SUMS. No Electron runtime or npm registry publication."
+          fi
 
   notify-ecosystem:
     needs: publish
