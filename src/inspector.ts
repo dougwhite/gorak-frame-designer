@@ -165,6 +165,7 @@ export const enums: Record<string, Record<string, string>> = {
     "7": "FP_LIGHTSHADE",
     "8": "FP_DARKSHADE",
     "9": "FP_BITMAP",
+    "11": "FP_BITMAPCLEAR",
   },
   bgdisplaypolicy: {
     "-1": "BDP_DEFAULT",

@@ -31,7 +31,12 @@ test("desktop host checks both baselines and saves only the opened documents", a
   };
   const context = {
     module: { exports: {} },
-    require: (name) => (name === "electron" ? electron : require(name)),
+    require: (name) =>
+      name === "electron"
+        ? electron
+        : name === "./image-assets.cjs"
+          ? require("../electron/image-assets.cjs")
+          : require(name),
     process: { argv: [] },
     Buffer,
   };

@@ -10,7 +10,7 @@ import type { FrameMetadata } from "./metadata";
 import { paletteFor } from "./palette.ts";
 import { fieldChoices, fieldColumns } from "./choices.ts";
 import { matrixLayout, outerPadding } from "./container-layout.ts";
-import { decodeBitmap, type FieldBitmap } from "./bitmap.ts";
+import { nodeBitmap, type FrameImages } from "./images.ts";
 
 /** Geometry is in thousandths of an inch; CSS reference pixels use 96 dpi. */
 import { WML_TO_CSS, segmentGeometry } from "./geometry.ts";
@@ -56,6 +56,7 @@ export function frameFromWml(
   source: WmlDocument,
   layers: readonly DefaultsLayer[],
   metadata?: FrameMetadata,
+  images: FrameImages = {},
 ): FrameDocument {
   const form = source.root.children.find((node) => node.kind === "topform");
   if (!form) throw Error("Frame has no topform");
@@ -68,7 +69,6 @@ export function frameFromWml(
     return parsed;
   };
   const fields: FrameField[] = [];
-  const bitmaps = new Map<string, FieldBitmap | undefined>();
   const object = (value: unknown): Record<string, unknown> =>
     value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
@@ -136,16 +136,13 @@ export function frameFromWml(
         ? [...scopes, { folderId: folder.id, index }]
         : scopes;
     const bitmapNode = node.children.find((c) =>
-      ["bitmaplabel", "bitmap", "normalbitmap"].includes(c.kind),
+      ["bitmaplabel", "bitmap", "image", "normalbitmap"].includes(c.kind),
     );
-    const bitmapSource = bitmapNode?.attributes.obj_encoded?.value;
-    if (bitmapSource && !bitmaps.has(bitmapSource))
-      bitmaps.set(bitmapSource, decodeBitmap(bitmapSource));
-    const selectedBitmapSource = node.children.find(
-      (c) => c.kind === "selectedbitmap",
-    )?.attributes.obj_encoded?.value;
-    if (selectedBitmapSource && !bitmaps.has(selectedBitmapSource))
-      bitmaps.set(selectedBitmapSource, decodeBitmap(selectedBitmapSource));
+    const bitmap = nodeBitmap(bitmapNode, images);
+    const selectedBitmap = nodeBitmap(
+      node.children.find((c) => c.kind === "selectedbitmap"),
+      images,
+    );
     const field: FrameField = {
       id: node.id,
       parentId: parent?.id,
@@ -172,7 +169,7 @@ export function frameFromWml(
         "listviewfield",
         "palettefield",
       ].includes(node.kind)
-        ? fieldChoices(node, layers)
+        ? fieldChoices(node, layers, images)
         : undefined,
       columns:
         node.kind === "listviewfield" ? fieldColumns(node, layers) : undefined,
@@ -181,10 +178,12 @@ export function frameFromWml(
         kind === "tabfield" && folder
           ? { folderId: folder.id, index }
           : undefined,
-      bitmap: bitmapSource ? bitmaps.get(bitmapSource) : undefined,
-      selectedBitmap: selectedBitmapSource
-        ? bitmaps.get(selectedBitmapSource)
-        : undefined,
+      backgroundBitmap: nodeBitmap(
+        node.children.find((c) => c.kind === "bgbitmap"),
+        images,
+      ),
+      bitmap,
+      selectedBitmap,
     };
     if (field.width < 0 || field.height < 0)
       throw Error("Negative field dimensions");
@@ -214,7 +213,7 @@ export function frameFromWml(
         field.prototype = {
           kind: protoKind,
           properties: props,
-          choices: fieldChoices(proto, layers),
+          choices: fieldChoices(proto, layers, images),
         };
       }
     }
@@ -367,6 +366,10 @@ export function frameFromWml(
         "window.height",
       ) * WML_TO_CSS,
     fields,
+    backgroundBitmap: nodeBitmap(
+      form.children.find((c) => c.kind === "bgbitmap"),
+      images,
+    ),
     source,
     metadata,
     formId: form.id,

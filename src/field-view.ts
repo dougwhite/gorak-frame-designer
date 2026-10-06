@@ -1,5 +1,35 @@
 import type { FrameField } from "./designer";
 import { applyAppearance } from "./appearance";
+import type { FieldBitmap } from "./bitmap";
+const backgroundUrls = new WeakMap<FieldBitmap, string>();
+export function applyBitmapBackground(
+  element: HTMLElement,
+  bitmap?: FieldBitmap,
+  pattern?: string,
+): void {
+  if (pattern !== "9" && pattern !== "11") bitmap = undefined;
+  let url = bitmap ? backgroundUrls.get(bitmap) : undefined;
+  if (bitmap && !url) {
+    const canvas = document.createElement("canvas");
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas
+      .getContext("2d")
+      ?.putImageData(
+        new ImageData(
+          new Uint8ClampedArray(bitmap.rgba),
+          canvas.width,
+          canvas.height,
+        ),
+        0,
+        0,
+      );
+    url = canvas.toDataURL();
+    backgroundUrls.set(bitmap, url);
+  }
+  element.style.backgroundImage = url ? `url(${url})` : "";
+  element.style.backgroundRepeat = "no-repeat";
+}
 const containers = new Set([
   "flexibleform",
   "subform",
@@ -17,6 +47,7 @@ const containers = new Set([
 /** Render source data using DOM text only. Runtime scripts and HTML are never evaluated. */
 export function renderField(element: HTMLElement, field: FrameField): void {
   const props = field.properties;
+  applyBitmapBackground(element, field.backgroundBitmap, props.bgpattern);
   const bitmap = (image = field.bitmap, target: HTMLElement = element) => {
     if (!image) return false;
     const canvas = document.createElement("canvas");

@@ -1,5 +1,6 @@
 import { structuredDefaults, type DefaultsLayer, type WmlNode } from "./wml.ts";
 import { decodeBitmap, type FieldBitmap } from "./bitmap.ts";
+import { nodeBitmap, type FrameImages } from "./images.ts";
 export interface FieldChoice {
   label: string;
   value: string;
@@ -39,6 +40,7 @@ export function fieldColumns(
 export function fieldChoices(
   node: WmlNode,
   layers: readonly DefaultsLayer[],
+  images: FrameImages = {},
 ): readonly FieldChoice[] {
   const explicit = node.children.find((c) => c.kind === "valuelist");
   if (explicit) {
@@ -51,9 +53,9 @@ export function fieldChoices(
         label:
           c.attributes.enumdisplay?.value ?? c.attributes.enumtext?.value ?? "",
         value: c.attributes.enumvalue?.value ?? "",
-        ...bitmapProperty(
-          c.children.find((n) => n.kind === "enumbitmap")?.attributes
-            .obj_encoded?.value ?? "",
+        bitmap: nodeBitmap(
+          c.children.find((n) => n.kind === "enumbitmap"),
+          images,
         ),
       }));
   }

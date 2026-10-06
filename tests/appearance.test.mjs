@@ -20,3 +20,9 @@ test("clear patterns and zero outlines remain clear after colour application", (
   assert.equal(element.style.borderWidth, "0");
   assert.equal(element.style.fontSize, "12px");
 });
+
+test("transparent bitmap backgrounds retain a clear native fill", () => {
+  const element = { style: {} };
+  applyAppearance(element, { bgcolor: "6", bgpattern: "11" });
+  assert.equal(element.style.backgroundColor, "transparent");
+});
