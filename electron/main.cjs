@@ -40,6 +40,10 @@ app.whenReady().then(async () => {
       file,
       `<frame><topform width="5000" height="3000" bgpattern="9"><bgbitmap src="images/badge.png"/><buttonfield name="action" width="1400" height="300" textlabel="Run"><bitmaplabel src="images/badge.png"/><selectedbitmap src="images/badge.png" mask="${mask}"/></buttonfield><palettefield name="choices" ytop="500" width="1400" height="300"><valuelist><choiceitems><row enumvalue="1"><enumbitmap src="builtin:pal_icon2"/></row></choiceitems></valuelist></palettefield></topform></frame>`,
     );
+    fs.writeFileSync(
+      file.slice(0, -4) + ".w4gl",
+      '[frametemplate]\nwindowwidth = "5000" # preserve\nwindowheight = "3000"\n\n[taggedvalues]\nnote = "opaque"\n\n===\ninitialize() = { /* preserved script */ }\n',
+    );
     process.argv.push("--open", file);
   }
   require("./document-host.cjs")(window);

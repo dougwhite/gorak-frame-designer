@@ -13,11 +13,12 @@ export function parseMetadata(
   text: string,
 ): FrameMetadata {
   if (text.length > 8_000_000) throw Error("Companion metadata exceeds 8 MB");
-  const header = /^\[framesource\]\s*\r?$/m.exec(text);
-  if (!header) throw Error("Companion source has no framesource section");
+  const header = /^\[(?:framesource|frametemplate)\][ \t]*\r?$/m.exec(text);
+  if (!header)
+    throw Error("Companion source has no framesource or frametemplate section");
   const start = header.index + header[0].length;
   const remainder = text.slice(start),
-    next = /^\s*(?:\[|===)/m.exec(remainder);
+    next = /^[ \t]*(?:\[|===)/m.exec(remainder);
   const end = next ? start + next.index : text.length;
   const attributes: Record<string, Attribute> = Object.create(null);
   const rows =
@@ -75,7 +76,12 @@ export function metadataEdit(
       start: doc.insertAt,
       end: doc.insertAt,
       expected: "",
-      text: newline + additions.join(newline) + newline,
+      text:
+        (doc.insertAt > 0 && doc.text[doc.insertAt - 1] !== "\n"
+          ? newline
+          : "") +
+        additions.join(newline) +
+        newline,
     });
   }
   return { uri: doc.uri, version: doc.version, edits };

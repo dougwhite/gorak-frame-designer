@@ -33,7 +33,10 @@ The desktop adapter reads only requested assets in the opened application's
 `images/` directory. It rejects traversal and symlinks, with limits of 8 MB per
 PNG, 1,048,576 pixels per image, 256 references and a 32 MB frame image budget.
 `test:desktop` includes a separate end-to-end PNG/built-in/mask/background check
-and verifies that edits and undo retain image references.
+and verifies that edits and undo retain image references. It opens a frame-template
+companion and checks metadata edits and undo. Synthetic LF/CRLF regressions
+verify `[framesource]` / `[frametemplate]` source preservation and targeted geometry
+and metadata edits.
 
 | Evidence | Result | Limit |
 | --- | --- | --- |

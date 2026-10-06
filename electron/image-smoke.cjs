@@ -8,6 +8,7 @@ module.exports = `(async () => { try {
     await new Promise(resolve => setTimeout(resolve, 25));
   }
   const doc = designer.document, root = designer.shadowRoot;
+  if (!doc.metadata?.text.startsWith("[frametemplate]")) throw Error("Template companion did not load");
   const button = doc.fields.find(f => f.kind === 'buttonfield');
   const palette = doc.fields.find(f => f.kind === 'palettefield');
   if (!doc.backgroundBitmap || !button.bitmap || !button.selectedBitmap || !palette.choices[0].bitmap) throw Error('Image references were not resolved');
@@ -22,9 +23,14 @@ module.exports = `(async () => { try {
   Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
   if (designer.document.source.text !== doc.source.text) throw Error('Undo changed image reference source');
   designer.selectFrame();
+  const width = root.querySelector('[aria-label="windowwidth"]');
+  width.value = '5500'; width.dispatchEvent(new Event('change'));
+  if (designer.document.metadata.text !== doc.metadata.text.replace('windowwidth = "5000"', 'windowwidth = "5500"') || designer.document.source.text !== doc.source.text) throw Error('Template metadata edit changed unrelated source');
+  Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
+  if (designer.document.metadata.text !== doc.metadata.text) throw Error('Template metadata undo lost component type or script');
   const pattern = root.querySelector('[aria-label="bgpattern"]');
   pattern.value = '1'; pattern.dispatchEvent(new Event('change'));
   if (root.querySelector('.canvas').style.backgroundImage) throw Error('Solid pattern displayed dormant bitmap');
   Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
-  return 'PASS: contract 3 PNG and built-in images, mask pixels, frame backgrounds, property edits and undo; '+Math.round(performance.now()-start)+' ms';
+  return 'PASS: contract 3 PNG and built-in images, mask pixels, frame backgrounds, template companion edits and undo; '+Math.round(performance.now()-start)+' ms';
 } catch(error) { return 'FAIL: '+error.stack; } })()`;
