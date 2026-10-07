@@ -95,7 +95,20 @@ export function numberedSlots(v: unknown, prefix: string): string[] {
 export function resolveStyles(layers: readonly StylesLayer[]): StyleObject {
   let result: StyleObject = structuredClone(stock);
   delete result.standalone;
-  for (const { defaults } of layers) {
+  for (const [index, { origin, defaults }] of layers.entries()) {
+    if (object(defaults) && Object.hasOwn(defaults, "absent")) {
+      if (
+        origin !== "Frame" ||
+        index !== layers.length - 1 ||
+        defaults.absent !== true ||
+        Object.keys(defaults).length !== 1
+      )
+        throw Error(
+          "Only a final Frame stylesheet can contain only absent: true",
+        );
+      // A native absent frame stylesheet opts out of parent palette inheritance.
+      return { absent: true };
+    }
     if (
       !object(defaults) ||
       Object.keys(defaults).some(
@@ -152,8 +165,9 @@ export interface StyleEntry {
   sample: StyleObject;
 }
 export function styleEntries(layers: readonly StylesLayer[]): StyleEntry[] {
-  const sheet = resolveStyles(layers),
-    groups = sheet.groups as Record<string, { styles: StyleObject }>;
+  const sheet = resolveStyles(layers);
+  if (sheet.absent === true) return [];
+  const groups = sheet.groups as Record<string, { styles: StyleObject }>;
   return (sheet.group_order as string[]).flatMap((group) =>
     numberedSlots(groups[group].styles, "style").map((slot, i) => {
       const sample = groups[group].styles[slot] as StyleObject;

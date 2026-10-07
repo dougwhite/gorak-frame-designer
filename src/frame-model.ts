@@ -82,11 +82,13 @@ export function frameFromWml(
     index = 0,
   ): void => {
     const kind =
-      node.kind === "row" && folder
-        ? context.type === "tabfield"
-          ? "tabfield"
-          : "tabpage"
-        : node.kind;
+      node.kind === "viewfield" && parent?.kind === "viewportfield"
+        ? (node.attributes.type?.value ?? "unknown")
+        : node.kind === "row" && folder
+          ? context.type === "tabfield"
+            ? "tabfield"
+            : "tabpage"
+          : node.kind;
     if (!visualKinds.has(kind)) {
       if (["tabpagearray", "tabfieldarray"].includes(node.kind) && parent) {
         const folderOwner =
@@ -168,11 +170,11 @@ export function frameFromWml(
         "radiofield",
         "listviewfield",
         "palettefield",
-      ].includes(node.kind)
+      ].includes(kind)
         ? fieldChoices(node, layers, images)
         : undefined,
       columns:
-        node.kind === "listviewfield" ? fieldColumns(node, layers) : undefined,
+        kind === "listviewfield" ? fieldColumns(node, layers) : undefined,
       pageScopes: pageScopes.length ? pageScopes : undefined,
       tabTarget:
         kind === "tabfield" && folder
@@ -207,9 +209,7 @@ export function frameFromWml(
                 : keys.includes("textlabel")
                   ? "buttonfield"
                   : "unknown");
-        const props = Object.fromEntries(
-          Object.entries(proto.attributes).map(([k, a]) => [k, a.value]),
-        );
+        const props = nodeProperties(proto);
         field.prototype = {
           kind: protoKind,
           properties: props,

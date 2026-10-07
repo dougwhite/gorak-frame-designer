@@ -16,6 +16,20 @@ module.exports = `(async () => { try {
   if (!root.querySelector('[data-field="'+button.id+'"] canvas')) throw Error('Button bitmap missing');
   if (button.selectedBitmap.rgba[3] !== 0 || button.selectedBitmap.rgba[7] !== button.bitmap.rgba[7]) throw Error('Native image mask failed');
   if (!Array.from(palette.choices[0].bitmap.rgba).some((v,i)=>i%4===3 && v===0)) throw Error('Built-in monochrome transparency failed');
+  if (palette.choices.length !== 2 || palette.choices[0].label !== ' &amp; ' || palette.choices[1].label !== '') throw Error('Literal/empty choice rows lost');
+  if (doc.palette.some(tool=>tool.kind)) throw Error('Absent stylesheet inherited creation samples');
+  const literal = doc.fields.find(f=>f.name==='literal'), content = doc.fields.find(f=>f.name==='content');
+  if (!literal || literal.parentId !== content?.id || literal.label !== ' &amp; ') throw Error('Typed viewport content lost');
+  if (!root.querySelector('[data-field="'+literal.id+'"]')?.textContent.includes(' &amp; ')) throw Error('Literal label did not render');
+  const zero = doc.fields.find(f=>f.name==='zero');
+  if (!zero || zero.width !== 0 || zero.height !== 0) throw Error('Zero shape geometry changed');
+  designer.selectField(content.id);
+  let navigation;designer.addEventListener('source-navigation',e=>navigation=e.detail,{once:true});designer.requestSourceNavigation(content.id);
+  if (!navigation?.range || doc.source.text.slice(navigation.range.start,navigation.range.end).indexOf('<viewfield') !== 0) throw Error('Typed viewport source navigation failed');
+  designer.readOnly=true;
+  const readonlyWidth=root.querySelector('[aria-label="width"]');
+  if(!readonlyWidth.disabled)throw Error('Contract fixture became editable in readOnly mode');
+  designer.readOnly=false;
   designer.selectField(button.id);
   const input = root.querySelector('[aria-label="width"]');
   input.value = '1800'; input.dispatchEvent(new Event('change'));
@@ -32,5 +46,5 @@ module.exports = `(async () => { try {
   pattern.value = '1'; pattern.dispatchEvent(new Event('change'));
   if (root.querySelector('.canvas').style.backgroundImage) throw Error('Solid pattern displayed dormant bitmap');
   Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
-  return 'PASS: contract 3 PNG and built-in images, mask pixels, frame backgrounds, template companion edits and undo; '+Math.round(performance.now()-start)+' ms';
+  return 'PASS: contract 12 literal/empty rows, absent stylesheet, typed viewport navigation and readOnly; PNG and built-in images, mask pixels, frame backgrounds, template companion edits and undo; '+Math.round(performance.now()-start)+' ms';
 } catch(error) { return 'FAIL: '+error.stack; } })()`;

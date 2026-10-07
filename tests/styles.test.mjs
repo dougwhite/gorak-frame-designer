@@ -102,3 +102,39 @@ test("null removals and native order hints preserve false, empty and insertion s
   );
   assert.throws(() => mergeStyles({ a: "1" }, { $order: [] }), /order/);
 });
+
+test("absent frame stylesheet opts out while empty delta inherits the palette", () => {
+  const parent = {
+    origin: "Application",
+    defaults: {
+      groups: { buttonfield: { styles: { style1: { bgcolor: "8" } } } },
+    },
+  };
+  assert.equal(
+    styleEntries([parent, { origin: "Frame", defaults: {} }]).find(
+      (e) => e.kind === "buttonfield",
+    ).sample.bgcolor,
+    "8",
+  );
+  assert.deepEqual(
+    resolveStyles([parent, { origin: "Frame", defaults: { absent: true } }]),
+    { absent: true },
+  );
+  assert.deepEqual(
+    styleEntries([parent, { origin: "Frame", defaults: { absent: true } }]),
+    [],
+  );
+  for (const defaults of [
+    { absent: false },
+    { absent: 1 },
+    { absent: true, groups: {} },
+  ])
+    assert.throws(
+      () => resolveStyles([{ origin: "Frame", defaults }]),
+      /absent: true/,
+    );
+  assert.throws(
+    () => resolveStyles([{ origin: "Project", defaults: { absent: true } }]),
+    /Frame/,
+  );
+});
