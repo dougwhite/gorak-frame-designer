@@ -10,6 +10,28 @@ module.exports = `(() => { try {
  const entry=d.document.fields.find(f=>f.kind==='entryfield').id;
  d.selectField(entry);
  if(d.selectedFieldId!==entry||get('datatype').value!=='varchar(40)')throw Error('Selection failed');
+ // Read-only is an opt-in component mode, and can be reversed at runtime.
+ if(d.readOnly!==false)throw Error('Editing must remain the component default');
+ const viewerSource=d.document.source.text, viewerMetadata=d.document.metadata?.text;
+ let viewerEdits=0;const countViewerEdit=()=>viewerEdits++;
+ d.addEventListener('edit-intent',countViewerEdit);
+ d.readOnly=true;
+ if(!get('width').disabled||root().querySelector('.handle')||getComputedStyle(root().querySelector('.palette')).display!=='none')throw Error('Read-only editing controls visible');
+ get('width').value='9999';get('width').dispatchEvent(new Event('change'));
+ d.deleteSelection();d.groupSelection('flexibleform');d.ungroupSelection();
+ d.dispatchEvent(new KeyboardEvent('keydown',{key:'Delete',bubbles:true}));
+ const viewerField=root().querySelector('[data-field="'+entry+'"]');
+ pointer(viewerField,'pointerdown',100,100);pointer(window,'pointermove',160,160);pointer(window,'pointerup',160,160);
+ if(root().querySelector('.preview'))throw Error('Read-only drag preview');
+ const zoomBefore=d.zoom;get('Zoom in').click();if(d.zoom<=zoomBefore)throw Error('Viewer zoom failed');get('Actual size').click();
+ let navigation;d.addEventListener('source-navigation',e=>navigation=e.detail,{once:true});d.requestSourceNavigation(entry);
+ if(!navigation?.range)throw Error('Viewer navigation failed');
+ d.selectFrame();if(!get('windowwidth').disabled)throw Error('Companion editable in viewer');
+ get('windowwidth').value='9999';get('windowwidth').dispatchEvent(new Event('change'));
+ if(viewerEdits||d.document.source.text!==viewerSource||d.document.metadata?.text!==viewerMetadata)throw Error('Viewer emitted an edit');
+ d.removeEventListener('edit-intent',countViewerEdit);
+ d.readOnly=false;d.selectField(entry);
+ if(get('width').disabled||!root().querySelector('.handle')||getComputedStyle(root().querySelector('.palette')).display==='none')throw Error('Editing did not resume');
  get('width').value='2600';get('width').dispatchEvent(new Event('change'));
  if(get('width').value!=='2600'||!document.title.includes('*'))throw Error('In-memory property edit failed');
  clickMenu('Undo');if(get('width').value!=='2400')throw Error('Undo failed');

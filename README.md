@@ -31,3 +31,5 @@ requests and pushes to `main`. On headless Linux, run the desktop smoke test wit
 ## License
 
 MIT. Copyright © 2026 Doug White.
+
+Hosts can set `designer.readOnly = true` for viewer mode. It defaults to `false`; setting it back restores editing. Viewer mode hides the palette and resize handles, disables property editing, and blocks edit intents (including deletion, grouping and dragging). Selection, property inspection, zoom/pan and source navigation remain available. Changing modes cancels any active gesture. Hosts must also enforce their own write policy at the message boundary.
