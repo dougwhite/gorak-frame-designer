@@ -1,4 +1,9 @@
-import { structuredDefaults, type DefaultsLayer, type WmlNode } from "./wml.ts";
+import {
+  nodeProperties,
+  structuredDefaults,
+  type DefaultsLayer,
+  type WmlNode,
+} from "./wml.ts";
 import { decodeBitmap, type FieldBitmap } from "./bitmap.ts";
 import { nodeBitmap, type FrameImages } from "./images.ts";
 export interface FieldChoice {
@@ -16,16 +21,7 @@ export function fieldColumns(
 ): readonly { label: string; width: number }[] {
   const explicit = node.children.find((c) => c.kind === "colattributes");
   const rows = explicit
-    ? explicit.children
-        .filter((c) => c.kind === "row")
-        .map((c) =>
-          Object.fromEntries(
-            Object.entries(c.attributes).map(([key, value]) => [
-              key,
-              value.value,
-            ]),
-          ),
-        )
+    ? explicit.children.filter((c) => c.kind === "row").map(nodeProperties)
     : ((
         structuredDefaults(node, layers).colattributes as
           { row?: Record<string, unknown>[] } | undefined
@@ -49,15 +45,17 @@ export function fieldChoices(
     return items
       .filter((c) => c.kind === "row")
       .slice(0, 10000)
-      .map((c) => ({
-        label:
-          c.attributes.enumdisplay?.value ?? c.attributes.enumtext?.value ?? "",
-        value: c.attributes.enumvalue?.value ?? "",
-        bitmap: nodeBitmap(
-          c.children.find((n) => n.kind === "enumbitmap"),
-          images,
-        ),
-      }));
+      .map((c) => {
+        const properties = nodeProperties(c);
+        return {
+          label: properties.enumdisplay ?? properties.enumtext ?? "",
+          value: properties.enumvalue ?? "",
+          bitmap: nodeBitmap(
+            c.children.find((n) => n.kind === "enumbitmap"),
+            images,
+          ),
+        };
+      });
   }
   if (Object.hasOwn(node.attributes, "valuelist")) return [];
   const list = structuredDefaults(node, layers).valuelist as

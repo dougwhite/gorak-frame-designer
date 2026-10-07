@@ -46,17 +46,21 @@ test("release frame loads explicit geometry and table hierarchy", () => {
     frame.fields.map((f) => [f.kind, f.name]),
     [
       ["entryfield", "quantity"],
+      ["entryfield", "nullable_default"],
+      ["entryfield", "specified_default"],
       ["buttonfield", "calculate"],
       ["tablefield", "results"],
       ["tablebody", ""],
       ["columnfield", "amount"],
+      ["viewportfield", "preview"],
+      ["flexibleform", "content"],
     ],
   );
   const body = frame.fields.find((f) => f.kind === "tablebody");
   assert.equal(body.parentId, field("results").id);
   assert.equal(field("amount").parentId, body.id);
   assert.equal(field("quantity").parentId, undefined);
-  assert.equal(new Set(frame.fields.map((f) => f.id)).size, 5);
+  assert.equal(new Set(frame.fields.map((f) => f.id)).size, 9);
   assert.deepEqual(
     [
       field("quantity").x,
@@ -101,7 +105,7 @@ test("navigation spans retain field definitions and opaque embedded event source
     const node = doc.nodes.find((n) => n.id === f.id);
     assert.deepEqual(f.source, { start: node.start, end: node.end });
     assert.ok(
-      source.slice(f.source.start, f.source.end).startsWith(`<${f.kind}`),
+      source.slice(f.source.start, f.source.end).startsWith(`<${node.kind}`),
     );
     if (f.name) {
       const span = node.attributes.name.valueSpan;
@@ -190,4 +194,59 @@ test("packaged built-in image identities match the certified gorak release", () 
         .digest("hex"),
       entry.sha256,
     );
+});
+
+test("candidate default modes and typed viewport retain WML identity", () => {
+  assert.equal(field("quantity").properties.defaultvalue, undefined);
+  assert.equal(field("nullable_default").properties.defaultvalue, "2");
+  assert.equal(field("specified_default").properties.defaultvalue, "3");
+  assert.equal(field("specified_default").properties.defaultstring, "7");
+  assert.equal(field("content").parentId, field("preview").id);
+  const content = field("content");
+  assert.equal(content.width, 1400 * WML_TO_CSS);
+  assert.equal(content.propertyOrigins.ismovebounded, "WML");
+  const next = applyIntent(doc, propertyEdit(doc, content.id, "width", "1300"));
+  assert.equal(
+    next.text,
+    source.replace(
+      'name="content" width="1400"',
+      'name="content" width="1300"',
+    ),
+  );
+});
+
+test("published absent stylesheet frame loads without inheriting a creation palette", () => {
+  const source = parseWml("unstyled.wml", 1, read("example/unstyled.wml"));
+  const metadata = parseMetadata(
+    "unstyled.w4gl",
+    1,
+    read("example/unstyled.w4gl"),
+  );
+  const frame = frameFromWml(
+    source,
+    [
+      ...layers.slice(0, 2),
+      {
+        origin: "Frame",
+        defaults: JSON.parse(read("example/unstyled.fielddefaults.json")),
+      },
+    ],
+    metadata,
+  );
+  assert.equal(frame.source, source);
+  assert.equal(frame.fields.length, 0);
+  assert.deepEqual(
+    [frame.width, frame.height],
+    [2000, 1000].map((n) => n * WML_TO_CSS),
+  );
+  assert.equal(
+    frame.palette.some((tool) => tool.kind),
+    false,
+  );
+  const next = applyIntent(
+    source,
+    propertyEdit(source, frame.formId, "width", "2200"),
+  );
+  assert.equal(next.text, source.text.replace('width="2000"', 'width="2200"'));
+  assert.equal(frameFromWml(next, [], metadata).width, 2200 * WML_TO_CSS);
 });

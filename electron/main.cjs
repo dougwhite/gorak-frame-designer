@@ -38,11 +38,15 @@ app.whenReady().then(async () => {
     const file = path.join(folder, "image-smoke.wml");
     fs.writeFileSync(
       file,
-      `<frame><topform width="5000" height="3000" bgpattern="9"><bgbitmap src="images/badge.png"/><buttonfield name="action" width="1400" height="300" textlabel="Run"><bitmaplabel src="images/badge.png"/><selectedbitmap src="images/badge.png" mask="${mask}"/></buttonfield><palettefield name="choices" ytop="500" width="1400" height="300"><valuelist><choiceitems><row enumvalue="1"><enumbitmap src="builtin:pal_icon2"/></row></choiceitems></valuelist></palettefield></topform></frame>`,
+      `<frame><topform width="5000" height="3000" bgpattern="9"><bgbitmap src="images/badge.png"/><buttonfield name="action" width="1400" height="300" textlabel="Run"><bitmaplabel src="images/badge.png"/><selectedbitmap src="images/badge.png" mask="${mask}"/></buttonfield><palettefield name="choices" ytop="500" width="1400" height="300"><valuelist><choiceitems><row enumvalue="1"><enumdisplay><![CDATA[ &amp; ]]></enumdisplay><enumbitmap src="builtin:pal_icon2"/></row><row/></choiceitems></valuelist></palettefield><viewportfield name="preview" ytop="900" width="1400" height="500"><viewfield type="flexibleform" name="content" width="1400" height="500"><freetrim name="literal" width="800" height="200"><textlabel><![CDATA[ &amp; ]]></textlabel></freetrim></viewfield></viewportfield><segmentshape name="zero" width="0" height="0"/></topform></frame>`,
     );
     fs.writeFileSync(
       file.slice(0, -4) + ".w4gl",
       '[frametemplate]\nwindowwidth = "5000" # preserve\nwindowheight = "3000"\n\n[taggedvalues]\nnote = "opaque"\n\n===\ninitialize() = { /* preserved script */ }\n',
+    );
+    fs.writeFileSync(
+      file.slice(0, -4) + ".fielddefaults.json",
+      '{"absent":true}',
     );
     process.argv.push("--open", file);
   }

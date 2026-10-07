@@ -146,15 +146,20 @@ export function parseWml(
       node.end = end + 1;
       if (!node.children.length && node.kind !== "script") {
         node.contentSpan = { start: node.openEnd, end: start };
-        node.value = decode(
-          text
-            .slice(node.openEnd, start)
-            .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, (_, v: string) => v)
-            .replace(
-              /<\?ingres_invalidxmlchar\s+(\d+)\s*\?>/g,
-              (_, n: string) => String.fromCodePoint(Number(n)),
-            ),
-        );
+        // Decode text tokens only: CDATA is literal and comments/PIs are not text.
+        node.value = text
+          .slice(node.openEnd, start)
+          .split(/(<!\[CDATA\[[\s\S]*?\]\]>|<!--[\s\S]*?-->|<\?[\s\S]*?\?>)/g)
+          .map((part) => {
+            if (part.startsWith("<![CDATA[")) return part.slice(9, -3);
+            const invalid = /^<\?ingres_invalidxmlchar\s+(\d+)\s*\?>$/.exec(
+              part,
+            );
+            if (invalid) return String.fromCodePoint(Number(invalid[1]));
+            if (part.startsWith("<!--") || part.startsWith("<?")) return "";
+            return decode(part);
+          })
+          .join("");
       }
     } else {
       const name = /^<([a-zA-Z_][\w:.-]*)/.exec(tag);
@@ -257,14 +262,21 @@ export function propertyEdit(
   if (!node) throw Error("Field no longer exists");
   const attr = node.attributes[key];
   const child = node.children.find(
-    (c) => c.kind === key && c.value !== undefined && c.kind !== "script",
+    (c) => c.kind === key && scalarValue(c) !== undefined,
   );
   let span: Span, replacement: string;
   if (child) {
     const span =
       value === null
         ? { start: child.start, end: child.end }
-        : child.contentSpan!;
+        : (child.contentSpan ?? { start: child.insertAt, end: child.end });
+    const content =
+      value === null
+        ? ""
+        : encode(value, '"').replace(
+            /[\x00-\x08\x0b\x0c\x0e-\x1f]/g,
+            (c) => `<?ingres_invalidxmlchar ${c.charCodeAt(0)}?>`,
+          );
     return {
       uri: doc.uri,
       version: doc.version,
@@ -273,12 +285,9 @@ export function propertyEdit(
           ...span,
           expected: doc.text.slice(span.start, span.end),
           text:
-            value === null
-              ? ""
-              : encode(value, '"').replace(
-                  /[\x00-\x08\x0b\x0c\x0e-\x1f]/g,
-                  (c) => `<?ingres_invalidxmlchar ${c.charCodeAt(0)}?>`,
-                ),
+            value === null || child.contentSpan
+              ? content
+              : `>${content}</${child.kind}>`,
         },
       ],
     };
@@ -491,6 +500,18 @@ export function deleteFields(
   };
 }
 
+// A self-closing scalar is explicitly empty, not absent. Attribute-bearing
+// objects and collections remain structured; scripts are always opaque.
+function scalarValue(node: WmlNode): string | undefined {
+  if (
+    node.kind === "script" ||
+    node.children.length ||
+    Object.keys(node.attributes).length
+  )
+    return undefined;
+  return node.value ?? "";
+}
+
 /** Scalar property elements (including invalid-XML-character PIs) remain source-addressable. */
 export function nodeProperties(node: WmlNode): Record<string, string> {
   return {
@@ -499,8 +520,8 @@ export function nodeProperties(node: WmlNode): Record<string, string> {
     ),
     ...Object.fromEntries(
       node.children
-        .filter((c) => c.kind !== "script" && c.value !== undefined)
-        .map((c) => [c.kind, c.value!]),
+        .filter((c) => scalarValue(c) !== undefined)
+        .map((c) => [c.kind, scalarValue(c)!]),
     ),
   };
 }
