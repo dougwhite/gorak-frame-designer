@@ -92,6 +92,19 @@ export class GorakFrameDesigner extends HTMLElement {
   #inspectorScroll = 0;
   #filter = "All";
   #gestureActive = false;
+  #cancelGesture?: () => void;
+  #readOnly = false;
+  /** Viewer mode; hosts opt in. Editing remains enabled by default. */
+  get readOnly(): boolean {
+    return this.#readOnly;
+  }
+  set readOnly(value: boolean) {
+    if (this.#readOnly === value) return;
+    this.#readOnly = value;
+    this.#cancelGesture?.();
+    this.#tool = "0";
+    this.#render();
+  }
   #scrollScheduled = false;
   #activePages = new Map<string, number>();
   set document(value: FrameDocument) {
@@ -148,6 +161,7 @@ export class GorakFrameDesigner extends HTMLElement {
     });
   }
   deleteSelection(): void {
+    if (this.#readOnly) return;
     const doc = this.#document;
     if (!doc?.source || !this.#selection.size) return;
     try {
@@ -160,6 +174,7 @@ export class GorakFrameDesigner extends HTMLElement {
     }
   }
   groupSelection(kind: GroupKind, orientation = 1): void {
+    if (this.#readOnly) return;
     const doc = this.#document;
     if (!doc?.source) return;
     try {
@@ -192,6 +207,7 @@ export class GorakFrameDesigner extends HTMLElement {
     }
   }
   ungroupSelection(): void {
+    if (this.#readOnly) return;
     const doc = this.#document,
       group = doc?.fields.find((f) => f.id === this.#selected);
     if (!doc?.source || !group || this.#selection.size !== 1) return;
@@ -290,6 +306,7 @@ export class GorakFrameDesigner extends HTMLElement {
     );
   }
   #edit(intent: EditIntent): void {
+    if (this.#readOnly) return;
     this.#emit("edit-intent", intent);
   }
   #error(error: unknown): void {
@@ -307,6 +324,11 @@ export class GorakFrameDesigner extends HTMLElement {
    .field{position:absolute;padding:0;border-radius:0;color:#111;font:11px Arial;white-space:nowrap;overflow:hidden;background:#f0f0f0;border:1px solid #111}.field.selected{outline:1px dotted #165da5;outline-offset:2px}.entryfield{background:white;text-align:left;box-sizing:content-box}.buttonfield{box-sizing:content-box;box-shadow:inset -1px -1px #777}.freetrim{background:transparent;border:0;text-align:left}.boxtrim{background:transparent;text-align:left}.ellipseshape{border-radius:50%;background:transparent}.linesegmentshape{border:0;border-top:1px solid #111;background:transparent}.togglefield{background:transparent;border:0;text-align:left}.unsupported{background:repeating-linear-gradient(45deg,#ddd,#ddd 4px,#eee 4px,#eee 8px);color:#555}.handle{position:absolute;width:7px;height:7px;background:#eff6ff;border:1px solid #216dcc;z-index:4;transform:translate(-50%,-50%);padding:0}.preview{position:absolute;border:1px dashed #216dcc;background:#499aff22;pointer-events:none}
    .inspector{display:flex;flex-direction:column;min-height:0;min-width:0;background:#293341;border-left:1px solid #526074}.inspector h3{padding:7px 7px 0}.selectors{padding:0 4px 3px;display:grid;grid-template-columns:2fr 1fr;gap:2px}.selectors .selection{grid-column:1/-1}.selectors select,.selectors input{height:21px;width:100%;min-width:0;border:1px solid #68758a;background:#202938;padding:1px 3px;border-radius:0}.properties{flex:1;overflow:auto;padding:2px 5px;background:#252e3b}.row{display:grid;grid-template-columns:46% 54%;min-height:18px;align-items:center}.row label{padding:1px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.value{min-width:0;width:100%;height:18px;padding:0 2px;background:transparent;border:1px solid transparent;border-radius:0;outline:0}.value:hover{border-color:#536078}.value:focus{background:#142237;border-color:#58a5ff}.value:disabled{color:#a9b4c6;opacity:1}.value option{background:#252e3b}.help{height:39px;padding:5px 7px;border-top:1px solid #526074;font-size:11px;color:#b3c1d5;overflow:hidden}
   </style><main><nav class="palette" aria-label="Field palette"><h3>Field Palette</h3><div class="tools"></div></nav><section class="workarea"><div class="zoomtools" aria-label="Zoom controls"><button data-action="out" aria-label="Zoom out" title="Zoom out">−</button><span></span><button data-action="in" aria-label="Zoom in" title="Zoom in">+</button><button data-action="reset" aria-label="Actual size" title="Actual size">⊙</button><button data-action="fit" aria-label="Fit frame" title="Fit frame">⛶</button></div><div class="viewport"><div class="extent"><div class="canvas"><div class="surface"></div></div></div></div></section><aside class="inspector"><h3>Property Inspector</h3><div class="selectors"><select class="selection" aria-label="Selected object"></select><input class="objectname" readonly aria-label="Object name"><select class="filter" aria-label="Property filter"><option>All</option><option>Appearance</option><option>Layout</option><option>Position and Size</option><option>Bias</option><option>Miscellaneous</option></select></div><div class="properties"></div><div class="help">Select a property to see its origin.</div></aside></main>`;
+    if (this.#readOnly) {
+      this.#root.querySelector<HTMLElement>(".palette")!.style.display = "none";
+      this.#root.querySelector<HTMLElement>("main")!.style.gridTemplateColumns =
+        "minmax(0,1fr) 310px";
+    }
     const doc = this.#document;
     if (!doc) return;
     const viewport = this.#root.querySelector<HTMLElement>(".viewport")!;
@@ -463,7 +485,7 @@ export class GorakFrameDesigner extends HTMLElement {
       };
       surface.append(el);
     }
-    if (selected && this.#selection.size === 1 && doc.source)
+    if (!this.#readOnly && selected && this.#selection.size === 1 && doc.source)
       this.#handles(
         canvas,
         selected.x,
@@ -472,7 +494,7 @@ export class GorakFrameDesigner extends HTMLElement {
         selected.height,
         (e, dir) => this.#resize(e, dir, selected),
       );
-    else if (!selected && (doc.metadata || doc.source))
+    else if (!this.#readOnly && !selected && (doc.metadata || doc.source))
       this.#handles(canvas, 0, 0, doc.width, doc.height, (e, dir) =>
         this.#resize(e, dir),
       );
@@ -678,6 +700,7 @@ export class GorakFrameDesigner extends HTMLElement {
           : `${displayValue(kind, key, inherited)} (Native default)`;
       const type = schema[kind]?.[key] ?? (formKey ? "xs:integer" : undefined);
       const editable =
+        !this.#readOnly &&
         !!type &&
         !!doc.source &&
         !(field?.propertyOrigins?.[key] === "Native container layout") &&
@@ -747,6 +770,7 @@ export class GorakFrameDesigner extends HTMLElement {
         help.textContent = details;
       };
       control.onchange = () => {
+        if (this.#readOnly) return;
         try {
           const value =
             control.value === "__inherit__" || control.value === defaultLabel
@@ -824,9 +848,11 @@ export class GorakFrameDesigner extends HTMLElement {
       options = { signal: controller.signal };
     const end = (cancelled: boolean) => {
       controller.abort();
+      this.#cancelGesture = undefined;
       this.#gestureActive = false;
       finish(cancelled);
     };
+    this.#cancelGesture = () => end(true);
     window.addEventListener(
       "pointermove",
       (event) => {
@@ -920,6 +946,7 @@ export class GorakFrameDesigner extends HTMLElement {
     return pageVisible(field, this.#activePages);
   }
   #move(e: PointerEvent, _field: FrameField): void {
+    if (this.#readOnly) return;
     if (!this.#document?.source) return;
     const doc = this.#document;
     const roots = selectionRoots(doc.source!, [...this.#selection]);
@@ -1052,6 +1079,7 @@ export class GorakFrameDesigner extends HTMLElement {
     );
   }
   #resize(e: PointerEvent, dir: string, field?: FrameField): void {
+    if (this.#readOnly) return;
     const doc = this.#document!,
       x = field?.x ?? 0,
       y = field?.y ?? 0,
@@ -1140,6 +1168,7 @@ export class GorakFrameDesigner extends HTMLElement {
     );
   }
   #create(e: PointerEvent, tool: PaletteTool): void {
+    if (this.#readOnly) return;
     this.focus({ preventScroll: true });
     const doc = this.#document!;
     if (!doc.source || !tool.kind || !tool.properties) return;
