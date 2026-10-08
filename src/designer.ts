@@ -52,12 +52,14 @@ export interface FieldActionRequest {
   version: number;
   fieldId: string;
   name: string;
+  qualifiedName?: string;
   range: { start: number; end: number };
 }
 export interface FrameField {
   id: string;
   kind: string;
   name: string;
+  qualifiedName?: string;
   x: number;
   y: number;
   width: number;
@@ -182,6 +184,7 @@ export class GorakFrameDesigner extends HTMLElement {
       version: doc.version,
       fieldId: field.id,
       name: field.name,
+      qualifiedName: field.qualifiedName ?? field.name,
       range: { ...range },
     };
     this.#emit("field-action", detail);
@@ -531,7 +534,7 @@ export class GorakFrameDesigner extends HTMLElement {
       el.type = "button";
       el.dataset.field = field.id;
       el.className = `field ${field.kind}${this.#selection.has(field.id) ? " selected" : ""}`;
-      el.title = `${field.name} (${field.kind.toUpperCase()})`;
+      el.title = `${field.qualifiedName ?? field.name} (${field.kind.toUpperCase()})`;
       Object.assign(el.style, {
         left: `${field.x}px`,
         top: `${field.y}px`,
@@ -640,7 +643,7 @@ export class GorakFrameDesigner extends HTMLElement {
       ["", doc.title.replace(/\.wml$/i, "")],
       ...choices.map((f) => [
         f.id,
-        `${f.name || "(unnamed)"} (${f.kind.toUpperCase()})`,
+        `${(f.qualifiedName ?? f.name) || "(unnamed)"} (${f.kind.toUpperCase()})`,
       ]),
     ]) {
       const o = document.createElement("option");

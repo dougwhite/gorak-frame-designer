@@ -52,6 +52,19 @@ const visualKinds = new Set([
   "tableheader",
   "titletrim",
 ]);
+// Named CompositeFields introduce a data scope; structural wrappers do not.
+const compositeKinds = new Set([
+  "subform",
+  "flexibleform",
+  "stackfield",
+  "matrixfield",
+  "viewportfield",
+  "tablefield",
+  "columnfield",
+  "tabfolder",
+  "tabbar",
+  "tabpage",
+]);
 export function frameFromWml(
   source: WmlDocument,
   layers: readonly DefaultsLayer[],
@@ -69,6 +82,7 @@ export function frameFromWml(
     return parsed;
   };
   const fields: FrameField[] = [];
+  const qualifiers = new Map<string, string>();
   const object = (value: unknown): Record<string, unknown> =>
     value && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
@@ -145,11 +159,17 @@ export function frameFromWml(
       node.children.find((c) => c.kind === "selectedbitmap"),
       images,
     );
+    const name = properties.name ?? "";
+    const qualifier = parent ? (qualifiers.get(parent.id) ?? "") : "";
+    const qualifiedName = name
+      ? [qualifier, name].filter(Boolean).join(".")
+      : "";
     const field: FrameField = {
       id: node.id,
       parentId: parent?.id,
       kind,
-      name: properties.name ?? "",
+      name,
+      qualifiedName,
       x:
         number(properties.xleft, `${node.id}.xleft`) * WML_TO_CSS +
         (parent?.x ?? 0),
@@ -190,6 +210,10 @@ export function frameFromWml(
     if (field.width < 0 || field.height < 0)
       throw Error("Negative field dimensions");
     fields.push(field);
+    qualifiers.set(
+      field.id,
+      compositeKinds.has(kind) && name ? qualifiedName : qualifier,
+    );
     if (kind === "columnfield") {
       const proto = node.children.find((c) => c.kind === "protofield");
       if (proto) {
