@@ -163,11 +163,16 @@ export class GorakFrameDesigner extends HTMLElement {
   }
   requestFieldAction(action: FieldAction, id = this.#selected): void {
     const doc = this.#document,
-      field = doc?.fields.find((f) => f.id === id);
+      field = doc?.fields.find((f) => f.id === id),
+      node = doc?.source?.nodes.find((node) => node.id === field?.id),
+      range =
+        node?.attributes.name?.valueSpan ??
+        node?.children.find((child) => child.kind === "name")?.contentSpan;
     if (
       !doc ||
       !field?.source ||
       !field.name ||
+      !range ||
       !["definition", "references"].includes(action)
     )
       return;
@@ -177,7 +182,7 @@ export class GorakFrameDesigner extends HTMLElement {
       version: doc.version,
       fieldId: field.id,
       name: field.name,
-      range: { ...field.source },
+      range: { ...range },
     };
     this.#emit("field-action", detail);
   }

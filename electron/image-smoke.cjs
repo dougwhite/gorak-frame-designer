@@ -18,7 +18,7 @@ module.exports = `(async () => { try {
   if (!Array.from(palette.choices[0].bitmap.rgba).some((v,i)=>i%4===3 && v===0)) throw Error('Built-in monochrome transparency failed');
   if (palette.choices.length !== 2 || palette.choices[0].label !== ' &amp; ' || palette.choices[1].label !== '') throw Error('Literal/empty choice rows lost');
   if (doc.palette.some(tool=>tool.kind)) throw Error('Absent stylesheet inherited creation samples');
-  const literal = doc.fields.find(f=>f.name==='literal'), content = doc.fields.find(f=>f.name==='content');
+  const literal = doc.fields.find(f=>f.name==='literal_é'), content = doc.fields.find(f=>f.name==='content');
   if (!literal || literal.parentId !== content?.id || literal.label !== ' &amp; ') throw Error('Typed viewport content lost');
   if (!root.querySelector('[data-field="'+literal.id+'"]')?.textContent.includes(' &amp; ')) throw Error('Literal label did not render');
   const zero = doc.fields.find(f=>f.name==='zero');
@@ -27,7 +27,7 @@ module.exports = `(async () => { try {
   let navigation;designer.addEventListener('source-navigation',e=>navigation=e.detail,{once:true});designer.requestSourceNavigation(content.id);
   if (!navigation?.range || doc.source.text.slice(navigation.range.start,navigation.range.end).indexOf('<viewfield') !== 0) throw Error('Typed viewport source navigation failed');
   let nestedAction;designer.addEventListener('field-action',e=>nestedAction=e.detail,{once:true});designer.requestFieldAction('references',literal.id);
-  if(nestedAction?.fieldId!==literal.id||nestedAction.name!=='literal'||nestedAction.version!==doc.version||doc.source.text.slice(nestedAction.range.start,nestedAction.range.end).indexOf('<freetrim')!==0)throw Error('Nested field action identity failed');
+  if(nestedAction?.fieldId!==literal.id||nestedAction.name!=='literal_é'||nestedAction.version!==doc.version||doc.source.text.slice(nestedAction.range.start,nestedAction.range.end)!==nestedAction.name)throw Error('Nested field action identity failed');
 
   designer.readOnly=true;
   const readonlyWidth=root.querySelector('[aria-label="width"]');

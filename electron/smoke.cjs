@@ -38,7 +38,7 @@ module.exports = `(() => { try {
  if(root().activeElement.textContent!=='Find All References')throw Error('Field menu keyboard navigation failed');
  root().activeElement.click();
  if(fieldActions.map(a=>a.action).join(',')!=='definition,references')throw Error('Field actions missing');
- for(const action of fieldActions)if(action.uri!==d.document.uri||action.version!==d.document.version||action.fieldId!==entry||action.name!==d.document.fields.find(f=>f.id===entry).name||!d.document.source.text.slice(action.range.start,action.range.end).startsWith('<entryfield'))throw Error('Field action identity mismatch: '+JSON.stringify(action));
+ for(const action of fieldActions)if(action.uri!==d.document.uri||action.version!==d.document.version||action.fieldId!==entry||action.name!==d.document.fields.find(f=>f.id===entry).name||d.document.source.text.slice(action.range.start,action.range.end)!==action.name)throw Error('Field action identity mismatch: '+JSON.stringify(action));
  openFieldMenu();root().querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
  if(root().querySelector('[role="menu"]'))throw Error('Field menu Escape failed');
 
