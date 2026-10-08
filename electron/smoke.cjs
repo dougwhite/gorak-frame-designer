@@ -5,6 +5,12 @@ module.exports = `(() => { try {
  const clickMenu=label=>Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith(label)).click();
  const pointer=(target,type,x,y,options={})=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,button:0,pointerId:7,clientX:x,clientY:y,...options}));
  if(!d||root().querySelectorAll('[data-field]').length!==3)throw Error('Missing fixture fields');
+ const fitButton=get('Fit frame'),fitIcon=fitButton.querySelector('svg');
+ if(!fitIcon||fitIcon.getAttribute('aria-hidden')!=='true')throw Error('Fit control icon missing');
+ const fitBounds=fitButton.getBoundingClientRect(),iconBounds=fitIcon.getBoundingClientRect();
+ if(Math.abs(fitBounds.top+fitBounds.height/2-iconBounds.top-iconBounds.height/2)>.5||Math.abs(fitBounds.left+fitBounds.width/2-iconBounds.left-iconBounds.width/2)>.5)throw Error('Fit control icon is not centered');
+ for(const control of root().querySelectorAll('.zoomtools button')){const bounds=control.getBoundingClientRect();if(Math.abs(bounds.top-fitBounds.top)>.5||bounds.height!==fitBounds.height)throw Error('Zoom controls are misaligned');}
+
  if(root().querySelector('nav').getAttribute('aria-label')!=='Field palette'||document.querySelector('.notice')||root().querySelector('[data-action="source"]'))throw Error('Editor layout failed');
  for(const [id,name] of [['12','ControlButton'],['13','BarField'],['15','RectangleShape'],['19','PaletteField'],['20','PopupButton'],['22','TabFolder']])if(!root().querySelector('[data-tool="'+id+'"]').getAttribute('aria-label').includes(name))throw Error('Incorrect native palette mapping: '+id);
  const entry=d.document.fields.find(f=>f.kind==='entryfield').id;
