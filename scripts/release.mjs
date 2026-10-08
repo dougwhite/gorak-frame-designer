@@ -89,6 +89,21 @@ try {
       );
     } else cpSync(src, dest);
   }
+  const hostFiles = [
+    "electron/image-assets.cjs",
+    "electron/image-assets.d.cts",
+    "src/builtin-images.json",
+    ...readdirSync(join(root, "src/builtin-images")).map(
+      (file) => `src/builtin-images/${file}`,
+    ),
+  ];
+  for (const file of hostFiles) {
+    const source = join(root, file),
+      destination = join(stage, file);
+    assert(lstatSync(source).isFile(), `Not a regular host asset: ${file}`);
+    mkdirSync(resolve(destination, ".."), { recursive: true });
+    cpSync(source, destination);
+  }
   const entry = "./dist-library/gorak-frame-designer.js";
   writeFileSync(
     join(stage, "package.json"),
@@ -101,7 +116,7 @@ try {
         main: entry,
         types: "./dist-library/designer.d.ts",
         exports: pkg.exports,
-        files: ["dist-library", "LICENSE", "THIRD-PARTY-NOTICES.txt"],
+        files: [...pkg.files, "LICENSE", "THIRD-PARTY-NOTICES.txt"],
       },
       null,
       2,
@@ -130,6 +145,7 @@ try {
     "LICENSE",
     "THIRD-PARTY-NOTICES.txt",
     ...files.map((file) => `dist-library/${file}`),
+    ...hostFiles,
   ].sort();
   assert.deepEqual(packed.files.map((file) => file.path).sort(), expected);
   const archive = join(scratch, packed.filename);
@@ -145,7 +161,7 @@ try {
   for (const file of expected) {
     const data = readFileSync(join(modules, file));
     assert.deepEqual(data, readFileSync(join(stage, file)));
-    if (/\.(js|css|json|ts|txt)$/.test(file))
+    if (/\.(c?js|css|json|c?ts|txt)$/.test(file))
       assert(
         !/(?:\b[A-Za-z]:[\\/](?!\/)|\/Users\/|\/home\/|file:\/\/\/|sourceMappingURL=)/.test(
           data.toString(),
@@ -165,12 +181,17 @@ try {
     assert.equal(typeof library.GorakFrameDesigner, 'function');
     assert.equal(registered.get('gorak-frame-designer'), library.GorakFrameDesigner);
     assert.equal(typeof library.frameFromWml, 'function');
+    assert.equal(typeof library.decodeFrameImages, 'function');
+    const { loadImages } = await import('${pkg.name}/image-assets');
+    const images = await loadImages('.', [['builtin:pal_icon2', null, null]]);
+    assert.equal(Object.keys(images).length, 1);
+    assert(Object.values(images)[0].png.length > 0);
   `,
   );
   execFileSync(process.execPath, [join(consumer, "import.mjs")]);
   writeFileSync(
     join(consumer, "consumer.ts"),
-    `import { GorakFrameDesigner, type FrameDocument } from '${pkg.name}';\nconst element: HTMLElement = new GorakFrameDesigner();\nlet document: FrameDocument;\nvoid element;\n`,
+    `import { GorakFrameDesigner, type FrameDocument } from '${pkg.name}';\nimport { loadImages } from '${pkg.name}/image-assets';\nvoid loadImages('.', [['builtin:pal_icon2', null, null]]);\nconst element: HTMLElement = new GorakFrameDesigner();\nlet document: FrameDocument;\nvoid element;\n`,
   );
   for (const resolution of ["NodeNext", "Bundler"]) {
     execFileSync(

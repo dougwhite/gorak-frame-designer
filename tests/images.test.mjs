@@ -7,7 +7,11 @@ import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 import { parseWml, applyIntent, propertyEdit } from "../src/wml.ts";
 import { frameFromWml } from "../src/frame-model.ts";
-import { imageKey, applyImageTransparency } from "../src/images.ts";
+import {
+  imageKey,
+  applyImageTransparency,
+  decodeFrameImages,
+} from "../src/images.ts";
 const require = createRequire(import.meta.url);
 const {
   loadImages,
@@ -121,4 +125,38 @@ test("native masks preserve MSB-first transparency and reject wrong dimensions o
   const mono = new Uint8ClampedArray([0, 0, 0, 255, 255, 255, 255, 255]);
   applyImageTransparency(mono, "2");
   assert.deepEqual([...mono], [0, 0, 0, 255, 0, 0, 0, 0]);
+});
+
+test("browser image decoding rejects oversized and inconsistent inputs before decode", async () => {
+  const asset = { width: 1, height: 1, png: new Uint8Array() };
+  for (const invalid of [
+    { ...asset, width: 0 },
+    { ...asset, height: -1 },
+    { ...asset, width: 1.5 },
+    { ...asset, width: 1048577 },
+    { ...asset, transparent: new Uint8Array(2) },
+    { ...asset, png: new Uint8Array(8000001) },
+  ])
+    await assert.rejects(
+      decodeFrameImages({ image: invalid }),
+      /bounds|dimensions/,
+    );
+  await assert.rejects(
+    decodeFrameImages(
+      Object.fromEntries(Array.from({ length: 257 }, (_, i) => [i, asset])),
+    ),
+    /Too many/,
+  );
+  await assert.rejects(
+    decodeFrameImages(
+      Object.fromEntries(
+        Array.from({ length: 7 }, (_, i) => [
+          i,
+          { ...asset, width: 1024, height: 1024 },
+        ]),
+      ),
+    ),
+    /32 MB/,
+  );
+  assert.deepEqual(await decodeFrameImages({}), {});
 });

@@ -26,6 +26,9 @@ module.exports = `(async () => { try {
   designer.selectField(content.id);
   let navigation;designer.addEventListener('source-navigation',e=>navigation=e.detail,{once:true});designer.requestSourceNavigation(content.id);
   if (!navigation?.range || doc.source.text.slice(navigation.range.start,navigation.range.end).indexOf('<viewfield') !== 0) throw Error('Typed viewport source navigation failed');
+  let nestedAction;designer.addEventListener('field-action',e=>nestedAction=e.detail,{once:true});designer.requestFieldAction('references',literal.id);
+  if(nestedAction?.fieldId!==literal.id||nestedAction.name!=='literal'||nestedAction.version!==doc.version||doc.source.text.slice(nestedAction.range.start,nestedAction.range.end).indexOf('<freetrim')!==0)throw Error('Nested field action identity failed');
+
   designer.readOnly=true;
   const readonlyWidth=root.querySelector('[aria-label="width"]');
   if(!readonlyWidth.disabled)throw Error('Contract fixture became editable in readOnly mode');

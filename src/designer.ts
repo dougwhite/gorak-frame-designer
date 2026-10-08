@@ -37,8 +37,23 @@ import { pageVisible, fieldClip } from "./field-visibility";
 import type { FieldBitmap } from "./bitmap";
 export * from "./wml";
 export * from "./metadata";
-export { imageKey, type FrameImages } from "./images";
+export {
+  imageKey,
+  decodeFrameImages,
+  applyImageTransparency,
+  type FrameImages,
+  type FrameImageAsset,
+} from "./images";
 export { frameFromWml, WML_TO_CSS } from "./frame-model";
+export type FieldAction = "definition" | "references";
+export interface FieldActionRequest {
+  action: FieldAction;
+  uri: string;
+  version: number;
+  fieldId: string;
+  name: string;
+  range: { start: number; end: number };
+}
 export interface FrameField {
   id: string;
   kind: string;
@@ -145,6 +160,82 @@ export class GorakFrameDesigner extends HTMLElement {
         fieldId: field.id,
         range: field.source,
       });
+  }
+  requestFieldAction(action: FieldAction, id = this.#selected): void {
+    const doc = this.#document,
+      field = doc?.fields.find((f) => f.id === id);
+    if (
+      !doc ||
+      !field?.source ||
+      !field.name ||
+      !["definition", "references"].includes(action)
+    )
+      return;
+    const detail: FieldActionRequest = {
+      action,
+      uri: doc.uri,
+      version: doc.version,
+      fieldId: field.id,
+      name: field.name,
+      range: { ...field.source },
+    };
+    this.#emit("field-action", detail);
+  }
+  #fieldMenu(field: FrameField, x: number, y: number): void {
+    this.selectField(field.id);
+    const menu = document.createElement("div");
+    menu.className = "field-menu";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", "Field navigation");
+    const close = () => {
+      menu.remove();
+      this.focus({ preventScroll: true });
+    };
+    for (const [action, label] of [
+      ["definition", "Go to Definition"],
+      ["references", "Find All References"],
+    ] as const) {
+      const button = document.createElement("button");
+      button.textContent = label;
+      button.setAttribute("role", "menuitem");
+      button.disabled = !field.name || !field.source;
+      button.onclick = () => {
+        close();
+        this.requestFieldAction(action, field.id);
+      };
+      menu.append(button);
+    }
+    menu.onkeydown = (event) => {
+      const buttons = [
+        ...menu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"),
+      ];
+      const index = buttons.indexOf(
+        this.#root.activeElement as HTMLButtonElement,
+      );
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+        event.preventDefault();
+        event.stopPropagation();
+        const next =
+          event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? buttons.length - 1
+              : (index + (event.key === "ArrowDown" ? 1 : buttons.length - 1)) %
+                buttons.length;
+        buttons[next]?.focus();
+      }
+    };
+    menu.addEventListener("focusout", (event) => {
+      if (!menu.contains(event.relatedTarget as Node | null)) menu.remove();
+    });
+    this.#root.append(menu);
+    menu.style.left = `${Math.max(0, Math.min(x, window.innerWidth - menu.offsetWidth))}px`;
+    menu.style.top = `${Math.max(0, Math.min(y, window.innerHeight - menu.offsetHeight))}px`;
+    menu.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
   }
   selectFields(ids: readonly string[]): void {
     this.#selection = new Set(
@@ -282,6 +373,18 @@ export class GorakFrameDesigner extends HTMLElement {
   }
   connectedCallback(): void {
     this.tabIndex = 0;
+    this.onpointerdown = (event) => {
+      if (
+        !event
+          .composedPath()
+          .some(
+            (target) =>
+              target instanceof Element &&
+              target.classList.contains("field-menu"),
+          )
+      )
+        this.#root.querySelector(".field-menu")?.remove();
+    };
     this.onkeydown = (event) => {
       if (
         event.key !== "Delete" ||
@@ -318,6 +421,7 @@ export class GorakFrameDesigner extends HTMLElement {
     const oldProps = this.#root.querySelector(".properties");
     if (oldProps) this.#inspectorScroll = oldProps.scrollTop;
     this.#root.innerHTML = `<style>
+   .field-menu{position:fixed;z-index:1000;min-width:175px;padding:4px;background:#293341;border:1px solid #68758a;box-shadow:0 3px 10px #0008}.field-menu button{display:block;width:100%;padding:5px 10px;text-align:left;border:0;background:transparent}.field-menu button:hover,.field-menu button:focus{background:#405778;outline:0}
    :host{display:block;height:100%;font:12px Arial,sans-serif;color:#dce3ee;background:#202733}*{box-sizing:border-box}button,input,select{font:inherit;color:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.4}
    main{display:grid;grid-template-columns:90px minmax(0,1fr) 310px;height:100%}.palette{border-right:1px solid #526074;background:#293341;padding:6px}.palette h3,.inspector h3{font-size:12px;font-weight:normal;margin:0 0 7px}.tools{display:grid;grid-template-columns:repeat(3,24px);gap:2px}.tool{height:25px;padding:0;border:1px solid #647185;border-radius:0;background:#e5e7e9;color:#10244b;font:bold 14px Arial}.tool[aria-pressed=true]{background:#9fcaff;border-color:#489dff;box-shadow:inset 0 0 0 1px #207de0}
    .workarea{position:relative;min-width:0;overflow:hidden}.zoomtools{position:absolute;z-index:5;left:16px;top:12px;display:flex;align-items:center;gap:3px;background:#303c4e;border:1px solid #536078;padding:3px;box-shadow:0 2px 6px #0003}.zoomtools button{width:26px;height:24px;padding:0;border:0;background:transparent;font-size:18px}.zoomtools button:hover{background:#526074}.zoomtools span{min-width:40px;text-align:center;font-size:11px}.viewport{height:100%;overflow:auto;padding:64px 48px;touch-action:none;background-color:#1e2530;background-image:radial-gradient(#52607466 .6px,transparent .6px);background-size:12px 12px}.extent{position:relative;min-width:100%;min-height:100%}.canvas{position:absolute;transform-origin:top left;box-shadow:0 4px 24px #0008;background:#f0f0f0;color:#111;outline:1px solid #9299a5}.surface{position:absolute;inset:0;overflow:hidden}.canvas.window-selected{outline:1px solid #56a0ff}
@@ -453,6 +557,11 @@ export class GorakFrameDesigner extends HTMLElement {
           el.style.borderBottomColor = "transparent";
         }
       }
+      el.oncontextmenu = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this.#fieldMenu(field, event.clientX, event.clientY);
+      };
       el.onpointerdown = (e) => {
         if (e.button !== 0 || e.altKey) return;
         e.stopPropagation();
@@ -761,6 +870,8 @@ export class GorakFrameDesigner extends HTMLElement {
       control.className = "value";
       control.setAttribute("aria-label", key);
       control.disabled = !editable;
+      if (this.#readOnly && control instanceof HTMLSelectElement)
+        control.style.appearance = "none";
       const details = `${label} · ${origin ?? "Not supplied; native default unresolved"}${geometry.test(label) ? " · 1/1000 inch" : ""}${!editable ? " · read only" : ""}`;
       control.title = details;
       row.onpointerenter = () => {

@@ -16,6 +16,7 @@ module.exports = `(() => { try {
  let viewerEdits=0;const countViewerEdit=()=>viewerEdits++;
  d.addEventListener('edit-intent',countViewerEdit);
  d.readOnly=true;
+ if(getComputedStyle(get('bgcolor')).appearance!=='none')throw Error('Viewer property dropdown arrow visible');
  if(!get('width').disabled||root().querySelector('.handle')||getComputedStyle(root().querySelector('.palette')).display!=='none')throw Error('Read-only editing controls visible');
  get('width').value='9999';get('width').dispatchEvent(new Event('change'));
  d.deleteSelection();d.groupSelection('flexibleform');d.ungroupSelection();
@@ -26,6 +27,21 @@ module.exports = `(() => { try {
  const zoomBefore=d.zoom;get('Zoom in').click();if(d.zoom<=zoomBefore)throw Error('Viewer zoom failed');get('Actual size').click();
  let navigation;d.addEventListener('source-navigation',e=>navigation=e.detail,{once:true});d.requestSourceNavigation(entry);
  if(!navigation?.range)throw Error('Viewer navigation failed');
+ const fieldActions=[];d.addEventListener('field-action',e=>fieldActions.push(e.detail));
+ const openFieldMenu=()=>root().querySelector('[data-field="'+entry+'"]').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,clientX:100,clientY:100}));
+ openFieldMenu();
+ let fieldMenu=root().querySelector('[role="menu"]');
+ if(!fieldMenu||d.selectedFieldId!==entry)throw Error('Field context menu missing');
+ fieldMenu.querySelector('button').click();
+ openFieldMenu();fieldMenu=root().querySelector('[role="menu"]');
+ fieldMenu.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));
+ if(root().activeElement.textContent!=='Find All References')throw Error('Field menu keyboard navigation failed');
+ root().activeElement.click();
+ if(fieldActions.map(a=>a.action).join(',')!=='definition,references')throw Error('Field actions missing');
+ for(const action of fieldActions)if(action.uri!==d.document.uri||action.version!==d.document.version||action.fieldId!==entry||action.name!==d.document.fields.find(f=>f.id===entry).name||!d.document.source.text.slice(action.range.start,action.range.end).startsWith('<entryfield'))throw Error('Field action identity mismatch: '+JSON.stringify(action));
+ openFieldMenu();root().querySelector('[role="menu"]').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));
+ if(root().querySelector('[role="menu"]'))throw Error('Field menu Escape failed');
+
  d.selectFrame();if(!get('windowwidth').disabled)throw Error('Companion editable in viewer');
  get('windowwidth').value='9999';get('windowwidth').dispatchEvent(new Event('change'));
  if(viewerEdits||d.document.source.text!==viewerSource||d.document.metadata?.text!==viewerMetadata)throw Error('Viewer emitted an edit');
