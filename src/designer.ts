@@ -237,7 +237,8 @@ export class GorakFrameDesigner extends HTMLElement {
         buttons[next]?.focus();
       }
     };
-    menu.addEventListener("focusout", () => {
+    menu.addEventListener("focusout", (event) => {
+      if (menu.contains(event.relatedTarget as Node | null)) return;
       // Removing a focused menu dispatches focusout during the removal itself.
       // Wait until focus settles instead of removing the same node reentrantly.
       queueMicrotask(() => {
