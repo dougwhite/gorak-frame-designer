@@ -1,6 +1,6 @@
 {
   "name": "gorak-frame-designer",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.5",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -21,10 +21,18 @@
     ".": {
       "types": "./dist-library/designer.d.ts",
       "import": "./dist-library/gorak-frame-designer.js"
+    },
+    "./image-assets": {
+      "types": "./electron/image-assets.d.cts",
+      "default": "./electron/image-assets.cjs"
     }
   },
   "files": [
-    "dist-library"
+    "dist-library",
+    "electron/image-assets.cjs",
+    "electron/image-assets.d.cts",
+    "src/builtin-images.json",
+    "src/builtin-images"
   ],
   "devDependencies": {
     "electron": "44.5.1",

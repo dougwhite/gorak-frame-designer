@@ -13,7 +13,7 @@ import {
   type FrameImages,
 } from "./designer";
 import "./shell.css";
-import { applyImageTransparency } from "./images";
+import { decodeFrameImages } from "./images";
 import { newFrameSource } from "./new-frame";
 interface OpenedFile {
   uri: string;
@@ -113,43 +113,13 @@ async function load(opened: OpenedFile): Promise<void> {
           opened.metadata.text,
         )
       : undefined;
-    const nextImages: Record<
-      string,
-      { width: number; height: number; rgba: Uint8ClampedArray }
-    > = {};
+    let nextImages: FrameImages = {};
     const references = [
       ...new Set(next.nodes.filter((n) => n.attributes.src).map(imageKey)),
     ].map((key) => JSON.parse(key) as (string | null)[]);
     if (references.length && window.frameHost) {
       const assets = await window.frameHost.images(opened.uri, references);
-      for (const [key, asset] of Object.entries(assets)) {
-        const bitmap = await createImageBitmap(
-          new Blob([new Uint8Array(asset.png)], { type: "image/png" }),
-        );
-        try {
-          if (bitmap.width !== asset.width || bitmap.height !== asset.height)
-            throw Error("Image dimensions differ");
-          const canvas = document.createElement("canvas");
-          canvas.width = bitmap.width;
-          canvas.height = bitmap.height;
-          const context = canvas.getContext("2d")!;
-          context.drawImage(bitmap, 0, 0);
-          const rgba = context.getImageData(
-            0,
-            0,
-            bitmap.width,
-            bitmap.height,
-          ).data;
-          applyImageTransparency(rgba, asset.flags, asset.transparent);
-          nextImages[key] = {
-            width: bitmap.width,
-            height: bitmap.height,
-            rgba,
-          };
-        } finally {
-          bitmap.close();
-        }
-      }
+      nextImages = await decodeFrameImages(assets);
     }
     frameFromWml(next, opened.layers, nextMetadata, nextImages);
     images = nextImages;
