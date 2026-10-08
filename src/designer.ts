@@ -237,8 +237,13 @@ export class GorakFrameDesigner extends HTMLElement {
         buttons[next]?.focus();
       }
     };
-    menu.addEventListener("focusout", (event) => {
-      if (!menu.contains(event.relatedTarget as Node | null)) menu.remove();
+    menu.addEventListener("focusout", () => {
+      // Removing a focused menu dispatches focusout during the removal itself.
+      // Wait until focus settles instead of removing the same node reentrantly.
+      queueMicrotask(() => {
+        if (menu.isConnected && !menu.contains(this.#root.activeElement))
+          menu.remove();
+      });
     });
     this.#root.append(menu);
     menu.style.left = `${Math.max(0, Math.min(x, window.innerWidth - menu.offsetWidth))}px`;
