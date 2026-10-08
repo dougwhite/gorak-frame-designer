@@ -90,3 +90,29 @@ test("clipping intersects enclosing pages while leaving ordinary layout containe
     undefined,
   );
 });
+
+test("qualified names follow named composites, including tab pages, without changing local names", () => {
+  const text =
+    '<frame><topform name="frame_root"><tabfolder><tabpagearray><row name="details"><stackfield><subform name="address" width="800" height="500"><entryfield name="line"/></subform></stackfield></row><row name="billing"><entryfield name="line"/></row></tabpagearray></tabfolder><tablefield name="items"><tablebody name="body_wrapper"><columnfield name="code"/></tablebody></tablefield><entryfield name="plain"/></topform></frame>';
+  const source = parseWml("neutral", 3, text);
+  const frame = frameFromWml(source, []);
+  assert.deepEqual(
+    frame.fields.filter((f) => f.name === "line").map((f) => f.qualifiedName),
+    ["details.address.line", "billing.line"],
+  );
+  assert.equal(
+    frame.fields.find((f) => f.name === "code").qualifiedName,
+    "items.code",
+  );
+  assert.equal(
+    frame.fields.find((f) => f.name === "plain").qualifiedName,
+    "plain",
+  );
+  for (const field of frame.fields.filter((f) => f.name === "line")) {
+    assert.equal(field.properties.name, "line");
+    const span = source.nodes.find((n) => n.id === field.id).attributes.name
+      .valueSpan;
+    assert.equal(source.text.slice(span.start, span.end), "line");
+  }
+  assert.equal(source.text, text);
+});

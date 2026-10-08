@@ -29,6 +29,11 @@ module.exports = `(async () => { try {
   let nestedAction;designer.addEventListener('field-action',e=>nestedAction=e.detail,{once:true});designer.requestFieldAction('references',literal.id);
   if(nestedAction?.fieldId!==literal.id||nestedAction.name!=='literal_é'||nestedAction.version!==doc.version||doc.source.text.slice(nestedAction.range.start,nestedAction.range.end)!==nestedAction.name)throw Error('Nested field action identity failed');
 
+  if(literal.qualifiedName!=='preview.content.literal_é'||nestedAction.qualifiedName!==literal.qualifiedName)throw Error('Nested qualified action name lost');
+  designer.selectField(literal.id);
+  if(root.querySelector('.objectname').value!==literal.name||!root.querySelector('.selection').selectedOptions[0].textContent.startsWith(literal.qualifiedName))throw Error('Inspector qualified name missing');
+  if(root.querySelector('[aria-label="name"]').value!=='literal_é')throw Error('Qualified display changed editable local Name');
+  designer.selectField(content.id);
   designer.readOnly=true;
   const readonlyWidth=root.querySelector('[aria-label="width"]');
   if(!readonlyWidth.disabled)throw Error('Contract fixture became editable in readOnly mode');
