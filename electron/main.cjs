@@ -36,9 +36,16 @@ app.whenReady().then(async () => {
     );
     const mask = "2x2:" + deflateSync(Buffer.from([128, 0])).toString("base64");
     const file = path.join(folder, "image-smoke.wml");
+    const frmflow = fs.readFileSync(
+      path.join(__dirname, "../tests/fixtures/frmflow.xml"),
+      "utf8",
+    );
     fs.writeFileSync(
       file,
-      `<frame><!-- 😀 --><topform width="5000" height="3000" bgpattern="9"><bgbitmap src="images/badge.png"/><buttonfield name="action" width="1400" height="300" textlabel="Run"><bitmaplabel src="images/badge.png"/><selectedbitmap src="images/badge.png" mask="${mask}"/></buttonfield><palettefield name="choices" ytop="500" width="1400" height="300"><valuelist><choiceitems><row enumvalue="1"><enumdisplay><![CDATA[ &amp; ]]></enumdisplay><enumbitmap src="builtin:pal_icon2"/></row><row/></choiceitems></valuelist></palettefield><viewportfield name="preview" ytop="900" width="1400" height="500"><viewfield type="flexibleform" name="content" width="1400" height="500"><freetrim name="literal_é" width="800" height="200"><textlabel><![CDATA[ &amp; ]]></textlabel></freetrim></viewfield></viewportfield><segmentshape name="zero" width="0" height="0"/></topform></frame>`,
+      `<frame><!-- 😀 --><topform width="5000" height="3000" bgpattern="9"><bgbitmap src="images/badge.png"/><buttonfield name="action" width="1400" height="300" textlabel="Run"><bitmaplabel src="images/badge.png"/><selectedbitmap src="images/badge.png" mask="${mask}"/></buttonfield><palettefield name="choices" ytop="500" width="1400" height="300"><valuelist><choiceitems><row enumvalue="1"><enumdisplay><![CDATA[ &amp; ]]></enumdisplay><enumbitmap src="builtin:pal_icon2"/></row><row/></choiceitems></valuelist></palettefield><viewportfield name="preview" ytop="900" width="1400" height="500"><viewfield type="flexibleform" name="content" width="1400" height="500"><freetrim name="literal_é" width="800" height="200"><textlabel><![CDATA[ &amp; ]]></textlabel></freetrim></viewfield></viewportfield><segmentshape name="zero" width="0" height="0"/></topform></frame>`.replace(
+        "</frame>",
+        frmflow + "</frame>",
+      ),
     );
     fs.writeFileSync(
       file.slice(0, -4) + ".w4gl",
