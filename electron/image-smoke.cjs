@@ -8,6 +8,16 @@ module.exports = `(async () => { try {
     await new Promise(resolve => setTimeout(resolve, 25));
   }
   const doc = designer.document, root = designer.shadowRoot;
+  const flow = doc.source.root.children.find(n=>n.kind==='frmflow');
+  if(!flow)throw Error('Structured frmflow fixture did not load');
+  const graph = doc.source.text.slice(flow.start,flow.end);
+  if(!graph.includes('oidref="22"')||!graph.includes('Größe &amp; Maß')||!graph.includes('<frame><name>order_search'))throw Error('Structured frmflow graph incomplete');
+  if(JSON.stringify(doc.fields.map(f=>f.name))!==JSON.stringify(['action','choices','preview','content','literal_é','zero']))throw Error('Query metadata became visual fields');
+  if(root.querySelector('.selection').textContent.includes('order_search'))throw Error('Query metadata entered field hierarchy');
+  const preservedFlow = () => {
+    const source=designer.document.source, flow=source.root.children.find(n=>n.kind==='frmflow');
+    if(!flow||source.text.slice(flow.start,flow.end)!==graph)throw Error('Designer edit changed frmflow source');
+  };
   if (!doc.metadata?.text.startsWith("[frametemplate]")) throw Error("Template companion did not load");
   const button = doc.fields.find(f => f.kind === 'buttonfield');
   const palette = doc.fields.find(f => f.kind === 'palettefield');
@@ -42,6 +52,14 @@ module.exports = `(async () => { try {
   const input = root.querySelector('[aria-label="width"]');
   input.value = '1800'; input.dispatchEvent(new Event('change'));
   if (!designer.document.fields.find(f=>f.id===button.id).bitmap) throw Error('Edit lost host images');
+  if(designer.document.fields.find(f=>f.id===button.id).properties.width!=='1800')throw Error('Geometry edit did not apply');
+  preservedFlow();
+  const label=root.querySelector('[aria-label="textlabel"]');
+  label.value='Find Größe';label.dispatchEvent(new Event('change'));
+  if(designer.document.fields.find(f=>f.id===button.id).label!=='Find Größe')throw Error('Property edit did not apply');
+  preservedFlow();
+  Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
+  preservedFlow();
   Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
   if (designer.document.source.text !== doc.source.text) throw Error('Undo changed image reference source');
   designer.selectFrame();
@@ -54,5 +72,6 @@ module.exports = `(async () => { try {
   pattern.value = '1'; pattern.dispatchEvent(new Event('change'));
   if (root.querySelector('.canvas').style.backgroundImage) throw Error('Solid pattern displayed dormant bitmap');
   Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
-  return 'PASS: contract 12 literal/empty rows, absent stylesheet, typed viewport navigation and readOnly; PNG and built-in images, mask pixels, frame backgrounds, template companion edits and undo; '+Math.round(performance.now()-start)+' ms';
+  preservedFlow();
+  return 'PASS: structured frmflow metadata isolation, graph preservation through geometry/property/template edits and undo; contract 12 literal/empty rows, absent stylesheet, typed viewport navigation and readOnly; PNG and built-in images, mask pixels, frame backgrounds, template companion edits and undo; '+Math.round(performance.now()-start)+' ms';
 } catch(error) { return 'FAIL: '+error.stack; } })()`;
