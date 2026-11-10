@@ -42,6 +42,7 @@ and metadata edits.
 | --- | --- | --- |
 | Pinned public contract 3 fixtures | Model, source spans, targeted edits and built-in checksums verified | Synthetic source |
 | Hidden Electron image smoke | PNG decoding, masks, background-pattern visibility and undo verified | Separate from visible Workbench acceptance |
+| Synthetic zero-size stack/matrix children | Omitted dimensions match explicit zero; source spans remain intact; hidden Electron verifies horizontal/vertical SVG strokes paint | Native separator appearance remains a separate visual acceptance check |
 | Isolated native palette-width edit | Push, compile and re-export preserved all image references and unrelated source bytes | Visible Workbench reopening remains separate |
 | Private local reference comparison | Recorded only in ignored `.local/` | No private source or screenshots are bundled |
 

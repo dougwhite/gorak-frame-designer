@@ -12,7 +12,7 @@ module.exports = `(async () => { try {
   if(!flow)throw Error('Structured frmflow fixture did not load');
   const graph = doc.source.text.slice(flow.start,flow.end);
   if(!graph.includes('oidref="22"')||!graph.includes('Größe &amp; Maß')||!graph.includes('<frame><name>order_search'))throw Error('Structured frmflow graph incomplete');
-  if(JSON.stringify(doc.fields.map(f=>f.name))!==JSON.stringify(['action','choices','preview','content','literal_é','zero']))throw Error('Query metadata became visual fields');
+  if(JSON.stringify(doc.fields.map(f=>f.name))!==JSON.stringify(['action','choices','preview','content','literal_é','zero','','horizontal','','','vertical']))throw Error('Query metadata became visual fields');
   if(root.querySelector('.selection').textContent.includes('order_search'))throw Error('Query metadata entered field hierarchy');
   const preservedFlow = () => {
     const source=designer.document.source, flow=source.root.children.find(n=>n.kind==='frmflow');
@@ -33,6 +33,22 @@ module.exports = `(async () => { try {
   if (!root.querySelector('[data-field="'+literal.id+'"]')?.textContent.includes(' &amp; ')) throw Error('Literal label did not render');
   const zero = doc.fields.find(f=>f.name==='zero');
   if (!zero || zero.width !== 0 || zero.height !== 0) throw Error('Zero shape geometry changed');
+  for (const name of ['horizontal', 'vertical']) {
+    const field = doc.fields.find(f=>f.name===name), axis = name==='horizontal' ? 'height' : 'width';
+    if (!field || field[axis] !== 0 || field.properties[axis] !== undefined) throw Error('Omitted segment dimension changed');
+    const element = root.querySelector('[data-field="'+field.id+'"]'), svg = element?.querySelector('svg'), line = svg?.querySelector('line');
+    if (!line || svg.viewBox.baseVal.width <= 0 || svg.viewBox.baseVal.height <= 0) throw Error('Segment SVG has no drawable viewport');
+    const bounds = svg.getBoundingClientRect();
+    if (!(bounds.width > 0 && bounds.height > 0) || getComputedStyle(svg).overflow !== 'visible' || getComputedStyle(element).overflow !== 'visible') throw Error('Zero-size segment stroke is clipped');
+    for (const key of ['x1', 'y1', 'x2', 'y2']) if (!Number.isFinite(Number(line.getAttribute(key)))) throw Error('Nonfinite segment endpoint');
+    // Rasterize the actual renderer SVG to verify a stroke survives the zero axis.
+    const copy = svg.cloneNode(true), width = Math.ceil(parseFloat(svg.style.width)), height = Math.ceil(parseFloat(svg.style.height));
+    copy.setAttribute('xmlns','http://www.w3.org/2000/svg'); copy.setAttribute('width',String(width)); copy.setAttribute('height',String(height));
+    const image = new Image(); image.src = 'data:image/svg+xml,'+encodeURIComponent(new XMLSerializer().serializeToString(copy)); await image.decode();
+    const canvas = document.createElement('canvas'); canvas.width=width; canvas.height=height;
+    const context=canvas.getContext('2d'); context.drawImage(image,0,0);
+    if (!context.getImageData(Math.floor(width/2),Math.floor(height/2),1,1).data[3]) throw Error('Axis-aligned segment did not paint');
+  }
   designer.selectField(content.id);
   let navigation;designer.addEventListener('source-navigation',e=>navigation=e.detail,{once:true});designer.requestSourceNavigation(content.id);
   if (!navigation?.range || doc.source.text.slice(navigation.range.start,navigation.range.end).indexOf('<viewfield') !== 0) throw Error('Typed viewport source navigation failed');
@@ -73,5 +89,5 @@ module.exports = `(async () => { try {
   if (root.querySelector('.canvas').style.backgroundImage) throw Error('Solid pattern displayed dormant bitmap');
   Array.from(document.querySelectorAll('.menubar button')).find(b=>b.textContent.startsWith('Undo')).click();
   preservedFlow();
-  return 'PASS: structured frmflow metadata isolation, graph preservation through geometry/property/template edits and undo; contract 12 literal/empty rows, absent stylesheet, typed viewport navigation and readOnly; PNG and built-in images, mask pixels, frame backgrounds, template companion edits and undo; '+Math.round(performance.now()-start)+' ms';
+  return 'PASS: structured frmflow metadata isolation, graph preservation through geometry/property/template edits and undo; contract 12 literal/empty rows, absent stylesheet, typed viewport navigation and readOnly; zero-size stack/matrix segments load and paint; PNG and built-in images, mask pixels, frame backgrounds, template companion edits and undo; '+Math.round(performance.now()-start)+' ms';
 } catch(error) { return 'FAIL: '+error.stack; } })()`;
