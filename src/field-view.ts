@@ -186,14 +186,23 @@ export function renderField(element: HTMLElement, field: FrameField): void {
   if (field.kind === "segmentshape") {
     element.style.background = "transparent";
     element.style.border = "0";
+    // Axis-aligned segments have a zero (often omitted) extent. Give their
+    // SVG a drawable viewport without changing source or model bounds.
+    element.style.overflow = "visible";
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute(
       "viewBox",
-      `0 0 ${Number(props.width)} ${Number(props.height)}`,
+      `0 0 ${Math.max(1, Number(props.width ?? 0))} ${Math.max(1, Number(props.height ?? 0))}`,
     );
     svg.setAttribute("preserveAspectRatio", "none");
-    svg.style.width = "100%";
-    svg.style.height = "100%";
+    Object.assign(svg.style, {
+      position: "absolute",
+      left: "0",
+      top: "0",
+      width: `${Math.max(1, field.width)}px`,
+      height: `${Math.max(1, field.height)}px`,
+      overflow: "visible",
+    });
     const line = document.createElementNS(svg.namespaceURI, "line");
     for (const point of [1, 2])
       for (const axis of ["x", "y"])
@@ -201,7 +210,7 @@ export function renderField(element: HTMLElement, field: FrameField): void {
           `${axis}${point}`,
           String(
             Number(props[`point${point}${axis}`] ?? 0) -
-              Number(props[axis === "x" ? "xleft" : "ytop"]),
+              Number(props[axis === "x" ? "xleft" : "ytop"] ?? 0),
           ),
         );
     line.setAttribute("stroke", "currentColor");

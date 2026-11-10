@@ -4,6 +4,75 @@ import { parseWml } from "../src/wml.ts";
 import { frameFromWml } from "../src/frame-model.ts";
 import { pageVisible, fieldClip } from "../src/field-visibility.ts";
 
+test("omitted dimensions in nested stacks and matrices retain zero geometry and source", () => {
+  for (const kind of ["stackfield", "matrixfield"])
+    for (const axis of ["width", "height"]) {
+      const extent = axis === "width" ? 'height="300"' : 'width="500"';
+      const endpoint = axis === "width" ? 'point2y="300"' : 'point2x="500"';
+      const text = `<frame><!-- preserve --><topform width="2000" height="1500"><${kind} xleft="100" ytop="200" width="1000" height="800" rows="1" columns="1"><stackfield ${extent}><segmentshape ${extent} ${endpoint}/></stackfield></${kind}></topform></frame>`;
+      const doc = parseWml("neutral", 7, text);
+      const frame = frameFromWml(doc, []);
+      const explicit = frameFromWml(
+        parseWml(
+          "neutral",
+          7,
+          text.replaceAll(extent, `${extent} ${axis}="0"`),
+        ),
+        [],
+      );
+      assert.equal(frame.fields.length, 3);
+      assert.deepEqual(
+        frame.fields.map(({ x, y, width, height }) => ({
+          x,
+          y,
+          width,
+          height,
+        })),
+        explicit.fields.map(({ x, y, width, height }) => ({
+          x,
+          y,
+          width,
+          height,
+        })),
+      );
+      for (const field of frame.fields.slice(1)) {
+        assert.equal(field[axis], 0);
+        assert.equal(field.properties[axis], undefined);
+        assert.ok(
+          [field.x, field.y, field.width, field.height].every(Number.isFinite),
+        );
+        assert.ok(
+          text
+            .slice(field.source.start, field.source.end)
+            .startsWith(`<${field.kind}`),
+        );
+      }
+      assert.equal(frame.source.text, text);
+      assert.equal(frame.version, 7);
+    }
+});
+
+test("container children still reject explicitly invalid dimensions", () => {
+  for (const kind of ["stackfield", "matrixfield"])
+    for (const axis of ["width", "height"])
+      for (const value of ["", "bad", "NaN", "Infinity", "-1"])
+        assert.throws(
+          () =>
+            frameFromWml(
+              parseWml(
+                "neutral",
+                1,
+                `<frame><topform><${kind} rows="1" columns="1"><segmentshape width="100" height="100"/></${kind}></topform></frame>`.replace(
+                  `${axis}="100"`,
+                  `${axis}="${value}"`,
+                ),
+              ),
+              [],
+            ),
+          /Invalid|Negative/,
+        );
+});
+
 test("tab-page wrappers retain parents, offsets and nested visibility without editing source", () => {
   const source =
     '<frame><topform width="4000" height="3000"><tabfolder xleft="100" ytop="200" width="2000" height="1500"><tabbar width="300" height="200"><tabfieldarray><row width="500" height="500" textlabel="First"/><row xleft="342" width="500" height="500" textlabel="Second"/></tabfieldarray></tabbar><tabpagearray><row ytop="220" width="2000" height="1280"><entryfield name="a" xleft="20" ytop="30" width="100" height="100"/></row><row ytop="220" width="2000" height="1280"><entryfield name="b" xleft="20" ytop="30" width="100" height="100"/></row></tabpagearray></tabfolder></topform></frame>';

@@ -315,8 +315,13 @@ export function frameFromWml(
           : horizontal
             ? index + 1
             : 1,
-      width: Number(child.properties.width) + outerPadding(child.kind),
-      height: Number(child.properties.height) + outerPadding(child.kind),
+      // Use the same omitted-zero rule as the initial field geometry.
+      width:
+        number(child.properties.width, `${child.id}.width`) +
+        outerPadding(child.kind),
+      height:
+        number(child.properties.height, `${child.id}.height`) +
+        outerPadding(child.kind),
       gravity: Number(child.properties.gravity ?? -1),
     }));
     const layout = matrixLayout(
